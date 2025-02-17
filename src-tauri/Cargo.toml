@@ -18,12 +18,17 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["devtools"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 tddata = { path = "tddata"}
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+tauri-plugin-log = "2"
+log = "0.4.22"
+chrono = "0.4.39"
+chrono-tz = "0.10.0"
 
 [workspace]
 members = ["tddata"]

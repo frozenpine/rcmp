@@ -1,10 +1,12 @@
+use std::fmt::Display;
+
 #[derive(Debug, Default, serde::Serialize, Clone)]
 pub enum CurrencyID {
     #[default]
     Invalid,
-    
+
     CNY,
-    USD
+    USD,
 }
 
 impl From<&str> for CurrencyID {
@@ -12,7 +14,7 @@ impl From<&str> for CurrencyID {
         match value {
             "CNY" | "￥" => Self::CNY,
             "USD" | "$" => Self::USD,
-            _ => Self::default()
+            _ => Self::default(),
         }
     }
 }
@@ -20,39 +22,50 @@ impl From<&str> for CurrencyID {
 impl<'de> serde::Deserialize<'de> for CurrencyID {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de> {
-        
+        D: serde::Deserializer<'de>,
+    {
         let v = serde_json::Value::deserialize(deserializer)?;
 
         match v {
             serde_json::Value::String(s) => Ok(Self::from(s.as_str())),
-            _ => Err(serde::de::Error::custom("unsupported value type"))
+            _ => Err(serde::de::Error::custom("unsupported value type")),
         }
     }
 }
 
-// type PercentValue = f64;
-//
-// impl<'de> serde::Deserialize<'de> for PercentValue {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: Deserializer<'de>
-//     {
-//         <f64 as serde::Deserialize>::deserialize(deserializer)
-//     }
-//
-//     fn deserialize_in_place<D>(deserializer: D, place: &mut Self) -> Result<(), D::Error>
-//     where
-//         D: Deserializer<'de>
-//     {
-//         todo!()
-//     }
-// }
+#[derive(Debug, Default, serde::Serialize, Copy, Clone)]
+pub struct PercentValue(f64);
+
+impl<'de> serde::Deserialize<'de> for PercentValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>
+    {
+        match <f64 as serde::Deserialize>::deserialize(deserializer) {
+            Ok(v) => {Ok(Self(v/100.0))},
+            Err(e) => Err(e)
+        }
+    }
+
+    fn deserialize_in_place<D>(deserializer: D, place: &mut Self) -> Result<(), D::Error>
+    where
+        D: serde::Deserializer<'de>
+    {
+        place.0 = f64::deserialize(deserializer)?;
+        Ok(())
+    }
+}
+
+impl Display for PercentValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:.2} %", self.0*100.0)
+    }
+}
 
 mod tu {
+    use super::{CurrencyID, PercentValue};
     use std::collections::hash_set;
     use std::io::Read;
-    use super::CurrencyID;
 
     #[derive(Debug, Default, serde::Deserialize, serde::Serialize, Clone)]
     pub struct Account {
@@ -61,16 +74,16 @@ mod tu {
 
         #[serde(rename(deserialize = "投资者帐号"))]
         pub user_id: String,
-        
+
         #[serde(rename(deserialize = "投资者名称"))]
         pub user_name: String,
-        
+
         #[serde(rename(deserialize = "风险度"))]
-        pub risk_percent: f64,
-        
+        pub risk_percent: PercentValue,
+
         #[serde(rename(deserialize = "昨权益"))]
         pub pre_balance: f64,
-        
+
         #[serde(rename(deserialize = "入金"))]
         pub deposit: f64,
 
@@ -132,7 +145,7 @@ mod tu {
         pub currency_pledge_out: f64,
 
         #[serde(rename(deserialize = "交易所风险度"))]
-        pub risk_percent_in_exchange: f64,
+        pub risk_percent_in_exchange: PercentValue,
 
         #[serde(rename(deserialize = "交易所保证金"))]
         pub margin_in_exchange: f64,
@@ -147,7 +160,15 @@ mod tu {
         pub currency_id: CurrencyID,
     }
 
-    pub fn read_account_csv(file_path: &str, accounts: &[&str]) -> Result<Vec<Account>, Box<dyn std::error::Error>> {
+    pub fn read_account_csv(
+        file_path: &str,
+        accounts: &[&str],
+    ) -> Result<Vec<Account>, Box<dyn std::error::Error>> {
+        log::debug!(
+            "opening csv file for data reading with accounts filter: {:?}, {:?}",
+            file_path, accounts,
+        );
+
         let f = std::fs::File::open(file_path)?;
         let mut decoder = encoding_rs_io::DecodeReaderBytesBuilder::new()
             .encoding(Some(encoding_rs::GB18030))
@@ -172,7 +193,10 @@ mod tu {
 
         while let Ok(exist) = finder.read_record(&mut record) {
             if !exist {
-                return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "csv parser error")));
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "csv parser error",
+                )));
             }
 
             let name = record.iter().next().unwrap_or("");
@@ -181,21 +205,22 @@ mod tu {
             match name {
                 "日期" => {
                     date = String::from(value);
+                    log::info!("trading day for account data found: {:?}", date);
                 }
                 "查询结果" => {
                     break;
-                },
+                }
                 _ => {}
             }
         }
 
-        let truncate_data = data[finder.position().byte() as usize + 1..].to_vec();
+        let truncate_data = data[finder.position().byte() as usize..].to_vec();
 
-        let mut parser = csv::ReaderBuilder::new()
-            .from_reader(truncate_data.as_slice());
+        let mut parser = csv::ReaderBuilder::new().from_reader(truncate_data.as_slice());
 
-        Ok(parser.deserialize::<Account>().filter_map(|row| {
-            match row {
+        Ok(parser
+            .deserialize::<Account>()
+            .filter_map(|row| match row {
                 Ok(mut v) => {
                     if acct_cache.is_empty() || acct_cache.contains(v.user_id.as_str()) {
                         v.trading_day = date.clone();
@@ -203,10 +228,10 @@ mod tu {
                     } else {
                         None
                     }
-                },
-                _ => None
-            }
-        }).collect())
+                }
+                _ => None,
+            })
+            .collect())
     }
 }
 
@@ -216,10 +241,11 @@ mod test {
     #[test]
     fn test_tu_accounts() {
         let find_accounts = tu::read_account_csv(
-            "../../data/查询资金2025-02-06.csv", &["880303"],
-        ).expect("read tu accounts failed");
+            "../../data/查询资金2025-02-06.csv", &["880303"])
+            .expect("read tu accounts failed");
 
         assert_eq!(find_accounts.len(), 1);
+        assert_eq!(find_accounts[0].user_id, "880303");
         println!("{:?}", &find_accounts);
     }
 }
