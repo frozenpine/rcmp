@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use super::db;
 
 #[derive(Debug, Default, serde::Serialize, Clone)]
 pub enum CurrencyID {
@@ -63,101 +64,175 @@ impl Display for PercentValue {
 }
 
 mod tu {
-    use super::{CurrencyID, PercentValue};
+    use super::{CurrencyID, PercentValue, db};
     use std::collections::hash_set;
     use std::io::Read;
 
     #[derive(Debug, Default, serde::Deserialize, serde::Serialize, Clone)]
     pub struct Account {
-        #[serde(skip_deserializing)]
+        #[serde(default, alias = "交易日")]
         pub trading_day: String,
 
-        #[serde(rename(deserialize = "投资者帐号"))]
+        #[serde(alias = "投资者帐号")]
         pub user_id: String,
 
-        #[serde(rename(deserialize = "投资者名称"))]
+        #[serde(alias = "投资者名称")]
         pub user_name: String,
 
-        #[serde(rename(deserialize = "风险度"))]
+        #[serde(alias = "风险度")]
         pub risk_percent: PercentValue,
 
-        #[serde(rename(deserialize = "昨权益"))]
+        #[serde(alias = "昨权益")]
         pub pre_balance: f64,
 
-        #[serde(rename(deserialize = "入金"))]
+        #[serde(alias = "入金")]
         pub deposit: f64,
 
-        #[serde(rename(deserialize = "出金"))]
+        #[serde(alias = "出金")]
         pub withdraw: f64,
 
-        #[serde(rename(deserialize = "冻结保证金"))]
+        #[serde(alias = "冻结保证金")]
         pub frozen_margin: f64,
 
-        #[serde(rename(deserialize = "冻结权利金"))]
+        #[serde(alias = "冻结权利金")]
         pub frozen_premium: f64,
 
-        #[serde(rename(deserialize = "冻结手续费"))]
+        #[serde(alias = "冻结手续费")]
         pub frozen_fee: f64,
 
-        #[serde(rename(deserialize = "保证金"))]
+        #[serde(alias = "保证金")]
         pub margin: f64,
 
-        #[serde(rename(deserialize = "权利金"))]
+        #[serde(alias = "权利金")]
         pub premium: f64,
 
-        #[serde(rename(deserialize = "手续费"))]
+        #[serde(alias = "手续费")]
         pub fee: f64,
 
-        #[serde(rename(deserialize = "持仓盈亏"))]
+        #[serde(alias = "持仓盈亏")]
         pub position_profit: f64,
 
-        #[serde(rename(deserialize = "平仓盈亏"))]
+        #[serde(alias = "平仓盈亏")]
         pub close_profit: f64,
 
-        #[serde(rename(deserialize = "权益"))]
+        #[serde(alias = "权益")]
         pub balance: f64,
 
-        #[serde(rename(deserialize = "可用资金"))]
+        #[serde(alias = "可用资金")]
         pub available: f64,
 
-        #[serde(rename(deserialize = "资金冻结"))]
+        #[serde(alias = "资金冻结")]
         pub frozen_balance: f64,
 
-        #[serde(rename(deserialize = "上次质押金额"))]
+        #[serde(alias = "上次质押金额")]
         pub pre_pledge: f64,
 
-        #[serde(rename(deserialize = "质押金额"))]
+        #[serde(alias = "质押金额")]
         pub pledge: f64,
 
-        #[serde(rename(deserialize = "投资者交割保证金"))]
+        #[serde(alias = "投资者交割保证金")]
         pub deliv_margin: f64,
 
-        #[serde(rename(deserialize = "上次货币质入金额"))]
+        #[serde(alias = "上次货币质入金额")]
         pub pre_currency_pledge_in: f64,
 
-        #[serde(rename(deserialize = "上次货币质出金额"))]
+        #[serde(alias = "上次货币质出金额")]
         pub pre_currency_pledge_out: f64,
 
-        #[serde(rename(deserialize = "货币质入金额"))]
+        #[serde(alias = "货币质入金额")]
         pub currency_pledge_in: f64,
 
-        #[serde(rename(deserialize = "货币质出金额"))]
+        #[serde(alias = "货币质出金额")]
         pub currency_pledge_out: f64,
 
-        #[serde(rename(deserialize = "交易所风险度"))]
+        #[serde(alias = "交易所风险度")]
         pub risk_percent_in_exchange: PercentValue,
 
-        #[serde(rename(deserialize = "交易所保证金"))]
+        #[serde(alias = "交易所保证金")]
         pub margin_in_exchange: f64,
 
-        #[serde(rename(deserialize = "交易所可用资金"))]
+        #[serde(alias = "交易所可用资金")]
         pub available_in_exchange: f64,
 
-        #[serde(rename(deserialize = "交易所交割保证金"))]
+        #[serde(alias = "交易所交割保证金")]
         pub deliv_margin_in_exchange: f64,
 
-        #[serde(rename(deserialize = "币种代码"))]
+        #[serde(alias = "币种代码")]
         pub currency_id: CurrencyID,
+    }
+    
+    impl db::AccountInfo for Account {
+        fn get_trading_day(&self) -> String {
+            self.trading_day.clone()
+        }
+
+        fn get_account_id(&self) -> String {
+            self.user_id.clone()
+        }
+
+        fn get_account_name(&self) -> String {
+            self.user_name.clone()
+        }
+
+        fn get_balance(&self) -> f64 {
+            self.balance
+        }
+
+        fn get_frozen_balance(&self) -> f64 {
+            self.frozen_balance
+        }
+
+        fn get_pre_balance(&self) -> f64 {
+            self.pre_balance
+        }
+
+        fn get_available(&self) -> f64 {
+            self.available
+        }
+
+        fn get_deposit(&self) -> f64 {
+            self.deposit
+        }
+
+        fn get_withdraw(&self) -> f64 {
+            self.withdraw
+        }
+
+        fn get_margin(&self) -> f64 {
+            self.margin
+        }
+
+        fn get_frozen_margin(&self) -> f64 {
+            self.frozen_margin
+        }
+
+        fn get_fee(&self) -> f64 {
+            self.fee
+        }
+
+        fn get_frozen_fee(&self) -> f64 {
+            self.frozen_fee
+        }
+
+        fn get_premium(&self) -> f64 {
+            self.premium
+        }
+
+        fn get_frozen_premium(&self) -> f64 {
+            self.frozen_premium
+        }
+
+        fn get_position_profit(&self) -> f64 {
+            self.position_profit
+        }
+
+        fn get_close_profit(&self) -> f64 {
+            self.close_profit
+        }
+
+        fn get_net_profit(&self) -> f64 {
+            self.position_profit+self.close_profit-self.fee
+        }
     }
 
     pub fn read_account_csv(
