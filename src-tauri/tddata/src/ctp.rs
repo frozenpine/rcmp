@@ -247,6 +247,7 @@ pub mod tu {
         }
 
         fn get_net_profit(&self) -> f64 {
+            // FIXME: 权利金计算
             self.position_profit+self.close_profit-self.fee
         }
 
@@ -336,12 +337,17 @@ mod test {
 
     #[test]
     fn test_tu_accounts() {
+        env_logger::Builder::new()
+            .filter_level(log::LevelFilter::Debug)
+            .target(env_logger::Target::Stdout)
+            .init();
+        
         let find_accounts = tu::read_account_csv(
             "../../data/查询资金2025-02-06.csv", &["880303"])
             .expect("read tu accounts failed");
 
         assert_eq!(find_accounts.len(), 1);
         assert_eq!(find_accounts[0].user_id, "880303");
-        println!("{:?}", &find_accounts);
+        log::info!("{:?}", &find_accounts);
     }
 }

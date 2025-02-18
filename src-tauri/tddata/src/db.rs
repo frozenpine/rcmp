@@ -5,7 +5,7 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use lazy_static::lazy_static;
-use sqlx::{Acquire, Executor};
+use sqlx::Executor;
 
 pub trait AccountInfo {
     fn get_trading_day(&self) -> String;
@@ -256,8 +256,7 @@ pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std
             let mut sql = post_conn.lock().unwrap().deref().to_string();
             sql.push(';');
 
-            // log::debug!("registering schema for conn with sql: {:?} {}", conn, sql);
-            println!("registering schema for conn with sql: {:?} {}", conn, sql);
+            log::debug!("registering schema for conn with sql: {:?} {}", conn, sql);
 
             Box::pin(async move {
                 conn.execute(sql.as_str()).await?;
@@ -281,6 +280,11 @@ mod test {
 
     #[test]
     fn test_open() {
+        env_logger::Builder::new()
+            .filter_level(log::LevelFilter::Debug)
+            .target(env_logger::Target::Stdout)
+            .init();
+        
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -289,12 +293,12 @@ mod test {
         rt.block_on(async {
             match open_db("..\\..\\data", &["fund"]).await {
                 Ok(db) => {
-                    println!("db opened: {:?}", db);
+                    log::info!("db opened: {:?}", db);
 
-                    println!("tables: {:?}", db.get_tables().await.unwrap())
+                    log::info!("tables: {:?}", db.get_tables().await.unwrap())
                 }
                 Err(e) => {
-                    println!("failed to open db: {:?}", e);
+                    log::error!("failed to open db: {:?}", e);
                 }
             }
         })
