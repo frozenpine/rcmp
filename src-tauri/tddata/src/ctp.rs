@@ -82,6 +82,7 @@ impl Display for PercentValue {
 pub mod tu {
     use super::{CurrencyID, PercentValue, db};
     use std::collections::hash_set;
+    use std::fmt::format;
     use std::io::Read;
 
     #[derive(Debug, Default, serde::Deserialize, serde::Serialize, Clone)]
@@ -299,14 +300,16 @@ pub mod tu {
             let value = record.iter().nth(1).unwrap_or("");
 
             match name {
+                "标题" => if value != "查询资金" { return Err(format!("invalid account data type: {}", value).into()) },
                 "日期" => {
                     date = String::from(value);
                     log::info!("trading day for account data found: {:?}", date);
                 }
+                "查询参数" | "BrokerID" | "UserID" => {}
                 "查询结果" => {
                     break;
                 }
-                _ => {}
+                _ => { return Err(format!("unknown account data prefix: {}, {}", name, value).into()) }
             }
         }
 
@@ -329,6 +332,34 @@ pub mod tu {
             })
             .collect())
     }
+
+    pub fn read_account_dir(
+        base_dir: &str,
+        accounts: &[&str],
+        mut depth: usize,
+    ) -> Result<Vec<Account>, Box<dyn std::error::Error>> {
+        let mut results: Vec<Vec<Account>> = Vec::new();
+
+        if depth < 1 {depth = 1;}
+
+        for entry in walkdir::WalkDir::new(base_dir)
+            .max_depth(depth)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| {
+                !e.file_type().is_dir() && e.file_name()
+                    .to_str()
+                    .unwrap_or("")
+                    .ends_with(".csv")
+            }) {
+
+            log::debug!("reading account data from: {:?}", entry);
+
+            results.push(read_account_csv(entry.path().to_str().unwrap(), accounts)?);
+        }
+
+        Ok(results.concat())
+    }
 }
 
 #[cfg(test)]
@@ -341,13 +372,29 @@ mod test {
             .filter_level(log::LevelFilter::Debug)
             .target(env_logger::Target::Stdout)
             .init();
-        
+
         let find_accounts = tu::read_account_csv(
             "../../data/查询资金2025-02-06.csv", &["880303"])
-            .expect("read tu accounts failed");
+            .unwrap();
 
         assert_eq!(find_accounts.len(), 1);
         assert_eq!(find_accounts[0].user_id, "880303");
         log::info!("{:?}", &find_accounts);
+    }
+
+    #[test]
+    fn test_tu_dir() {
+        env_logger::Builder::new()
+            .filter_level(log::LevelFilter::Debug)
+            .target(env_logger::Target::Stdout)
+            .init();
+
+        let accounts = tu::read_account_dir(
+            "../../data/", &["880303"], 1,
+        ).unwrap();
+        
+        accounts.iter().for_each(|account| {
+            log::info!("{:?}", account);
+        })
     }
 }
