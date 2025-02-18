@@ -160,7 +160,7 @@ mod tu {
         #[serde(alias = "币种代码")]
         pub currency_id: CurrencyID,
     }
-    
+
     impl db::AccountInfo for Account {
         fn get_trading_day(&self) -> String {
             self.trading_day.clone()

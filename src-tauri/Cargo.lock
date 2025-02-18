@@ -4857,10 +4857,12 @@ dependencies = [
  "csv",
  "encoding_rs",
  "encoding_rs_io",
+ "lazy_static",
  "log",
  "serde",
  "serde_json",
  "sqlx",
+ "tokio",
 ]
 
 [[package]]
