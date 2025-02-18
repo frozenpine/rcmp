@@ -20,6 +20,22 @@ impl From<&str> for CurrencyID {
     }
 }
 
+impl From<String> for CurrencyID {
+    fn from(value: String) -> Self {
+        Self::from(value.as_str())
+    }
+}
+
+impl Display for CurrencyID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CurrencyID::CNY => write!(f, "CNY"),
+            CurrencyID::USD => write!(f, "USD"),
+            _ => write!(f, "{:?}", self),
+        }
+    }
+}
+
 impl<'de> serde::Deserialize<'de> for CurrencyID {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -63,7 +79,7 @@ impl Display for PercentValue {
     }
 }
 
-mod tu {
+pub mod tu {
     use super::{CurrencyID, PercentValue, db};
     use std::collections::hash_set;
     use std::io::Read;
@@ -233,6 +249,10 @@ mod tu {
         fn get_net_profit(&self) -> f64 {
             self.position_profit+self.close_profit-self.fee
         }
+
+        fn get_currency_id(&self) -> String {
+            self.currency_id.to_string()
+        }
     }
 
     pub fn read_account_csv(
@@ -310,6 +330,7 @@ mod tu {
     }
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
 

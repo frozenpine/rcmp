@@ -1,11 +1,11 @@
 use sqlx::sqlite::SqlitePoolOptions;
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use lazy_static::lazy_static;
-use sqlx::Executor;
+use sqlx::{Acquire, Executor};
 
 pub trait AccountInfo {
     fn get_trading_day(&self) -> String;
@@ -26,6 +26,7 @@ pub trait AccountInfo {
     fn get_position_profit(&self) -> f64;
     fn get_close_profit(&self) -> f64;
     fn get_net_profit(&self) -> f64;
+    fn get_currency_id(&self) -> String;
 }
 
 #[derive(Debug, Clone, sqlx::FromRow, serde::Serialize, serde::Deserialize)]
@@ -48,6 +49,7 @@ pub struct DBAccount {
     pub position_profit: f64,
     pub close_profit: f64,
     pub net_profit: f64,
+    pub currency_id: String,
 }
 
 impl DBAccount {
@@ -71,6 +73,7 @@ impl DBAccount {
             position_profit: info.get_position_profit(),
             close_profit: info.get_close_profit(),
             net_profit: info.get_net_profit(),
+            currency_id: info.get_currency_id(),
         }
     }
 }
@@ -109,61 +112,107 @@ impl DB {
         todo!()
     }
 
-    pub async fn sink_accounts(&self, accounts: &[Ref<'_, dyn AccountInfo>]) -> Result<u64, Box<dyn std::error::Error>> {
+    pub async fn get_tables(&self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        let rows: Vec<(i64, String)> = sqlx::query_as("PRAGMA database_list;")
+            .fetch_all(&self.pool).await?;
+
+        let databases: Vec<String> = rows.into_iter().map(|row: (i64, String)|row.1).collect();
+
+        let mut tables: Vec<String> = Vec::with_capacity(databases.len());
+
+        for db in databases {
+            let sql = format!("SELECT name FROM {}.sqlite_master WHERE type='table';", db);
+
+            let results: Vec<(String, )> = sqlx::query_as(&sql)
+                .fetch_all(&self.pool).await?;
+
+            results.iter().for_each(|value| {
+                tables.push(format!("{}.{}", db, value.0));
+            })
+        }
+
+        Ok(tables)
+    }
+
+    pub async fn sink_accounts(&self, accounts: &[&dyn AccountInfo], batch_size: usize) -> Result<u64, Box<dyn std::error::Error>> {
+        log::debug!("sinking for account data: {}", accounts.len());
+
         let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-            "INSERT INTO fund.account (
+            "INSERT OR REPLACE INTO fund.account (
                 trading_day, account_id, account_name,
                 balance, frozen_balance, pre_balance,
                 available, deposit, withdraw,
                 margin, frozen_margin, fee, frozen_fee,
                 premium, frozen_premium,
-                position_profit, close_profit, net_profit) "
+                position_profit, close_profit, net_profit, currency_id) "
         );
 
-        qry_builder.push_values(accounts.iter().map(|acct| (
-            acct.get_trading_day(),
-            acct.get_account_id(),
-            acct.get_account_name(),
-            acct.get_balance(),
-            acct.get_frozen_balance(),
-            acct.get_pre_balance(),
-            acct.get_available(),
-            acct.get_deposit(),
-            acct.get_withdraw(),
-            acct.get_margin(),
-            acct.get_frozen_margin(),
-            acct.get_fee(),
-            acct.get_frozen_fee(),
-            acct.get_premium(),
-            acct.get_frozen_premium(),
-            acct.get_position_profit(),
-            acct.get_close_profit(),
-            acct.get_net_profit(),
-            )), |mut b, values  | {
-            b.push_bind(values.0)
-                .push_bind(values.1)
-                .push_bind(values.2)
-                .push_bind(values.3)
-                .push_bind(values.4)
-                .push_bind(values.5)
-                .push_bind(values.6)
-                .push_bind(values.7)
-                .push_bind(values.8)
-                .push_bind(values.9)
-                .push_bind(values.10)
-                .push_bind(values.11)
-                .push_bind(values.12)
-                .push_bind(values.13)
-                .push_bind(values.14)
-                .push_bind(values.15)
-                .push_bind(values.16)
-                .push_bind(values.17);
-        });
+        let mut count = 0_u64;
+        let mut leading = accounts;
+        let mut trailing;
 
-        let query = qry_builder.build();
-        let result = query.execute(&self.pool).await?;
+        loop {
+            if leading.len() > batch_size {
+                (leading, trailing) = leading.split_at(batch_size);
+            } else {
+                trailing = &[];
+            }
 
-        Ok(result.rows_affected())
+            qry_builder.reset().push_values(leading.iter().map(|acct| (
+                acct.get_trading_day(),
+                acct.get_account_id(),
+                acct.get_account_name(),
+                acct.get_balance(),
+                acct.get_frozen_balance(),
+                acct.get_pre_balance(),
+                acct.get_available(),
+                acct.get_deposit(),
+                acct.get_withdraw(),
+                acct.get_margin(),
+                acct.get_frozen_margin(),
+                acct.get_fee(),
+                acct.get_frozen_fee(),
+                acct.get_premium(),
+                acct.get_frozen_premium(),
+                acct.get_position_profit(),
+                acct.get_close_profit(),
+                acct.get_net_profit(),
+                acct.get_currency_id(),
+            )), |mut b, values| {
+                b.push_bind(values.0)
+                    .push_bind(values.1)
+                    .push_bind(values.2)
+                    .push_bind(values.3)
+                    .push_bind(values.4)
+                    .push_bind(values.5)
+                    .push_bind(values.6)
+                    .push_bind(values.7)
+                    .push_bind(values.8)
+                    .push_bind(values.9)
+                    .push_bind(values.10)
+                    .push_bind(values.11)
+                    .push_bind(values.12)
+                    .push_bind(values.13)
+                    .push_bind(values.14)
+                    .push_bind(values.15)
+                    .push_bind(values.16)
+                    .push_bind(values.17)
+                    .push_bind(values.18);
+            });
+
+            let query = qry_builder.build();
+            let result = query.execute(&self.pool).await?;
+
+            count += result.rows_affected();
+
+            if trailing.is_empty() {
+                break;
+            } else {
+                leading = trailing;
+            }
+        }
+
+        Ok(count)
     }
 
     pub fn is_closed(&self) -> bool {
@@ -199,18 +248,23 @@ pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std
         }
     }
 
+    // Opening in memory db & attach to file db specified by schemas
     let pool = SqlitePoolOptions::new()
         .min_connections(1)
         .max_connections(5)
         .after_connect(|conn, _meta| {
-            let sql = post_conn.lock().unwrap().deref().to_string();
+            let mut sql = post_conn.lock().unwrap().deref().to_string();
+            sql.push(';');
+
+            // log::debug!("registering schema for conn with sql: {:?} {}", conn, sql);
+            println!("registering schema for conn with sql: {:?} {}", conn, sql);
 
             Box::pin(async move {
                 conn.execute(sql.as_str()).await?;
                 Ok(())
             })
         })
-        .connect(":memory:")
+        .connect("")
         .await?;
 
     let db = DB{
@@ -221,6 +275,7 @@ pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std
     Ok(db)
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
 
@@ -232,16 +287,11 @@ mod test {
             .unwrap();
 
         rt.block_on(async {
-            match open_db("../../data", &["fund"]).await {
+            match open_db("..\\..\\data", &["fund"]).await {
                 Ok(db) => {
                     println!("db opened: {:?}", db);
 
-                    let rows: Vec<(i64, String)> = sqlx::query_as("PRAGMA database_list;")
-                        .fetch_all(&db.pool).await.unwrap();
-
-                    for row in rows {
-                        println!("{:?}", row);
-                    }
+                    println!("tables: {:?}", db.get_tables().await.unwrap())
                 }
                 Err(e) => {
                     println!("failed to open db: {:?}", e);
