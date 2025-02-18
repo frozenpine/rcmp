@@ -82,6 +82,7 @@ impl DBAccount {
 pub(crate) struct Schema {
     name: String,
     dsn: String,
+    tables: RefCell<Vec<(String, String)>>
 }
 
 impl Schema {
@@ -92,6 +93,7 @@ impl Schema {
         Schema{
             name: name.to_string(),
             dsn: dsn.as_path().to_str().unwrap().to_string(),
+            tables: RefCell::new(Vec::new())
         }
     }
 }
@@ -112,26 +114,22 @@ impl DB {
         todo!()
     }
 
-    pub async fn get_tables(&self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-        let rows: Vec<(i64, String)> = sqlx::query_as("PRAGMA database_list;")
-            .fetch_all(&self.pool).await?;
+    async fn get_tables(&self) -> Result<(), Box<dyn std::error::Error>> {
+        for schema in self.schemas.borrow().values() {
+            if !schema.tables.borrow().is_empty() { continue}
 
-        let databases: Vec<String> = rows.into_iter().map(|row: (i64, String)|row.1).collect();
+            let sql = format!("SELECT name, sql FROM {}.sqlite_master WHERE type='table';", schema.name);
 
-        let mut tables: Vec<String> = Vec::with_capacity(databases.len());
-
-        for db in databases {
-            let sql = format!("SELECT name FROM {}.sqlite_master WHERE type='table';", db);
-
-            let results: Vec<(String, )> = sqlx::query_as(&sql)
+            let results: Vec<(String, String)> = sqlx::query_as(&sql)
                 .fetch_all(&self.pool).await?;
 
             results.iter().for_each(|value| {
-                tables.push(format!("{}.{}", db, value.0));
+                log::debug!("table in schema[{}]: {}, {:?}", schema.name, schema.dsn, value);
+                schema.tables.borrow_mut().push(value.clone());
             })
         }
 
-        Ok(tables)
+        Ok(())
     }
 
     pub async fn sink_accounts(&self, accounts: &[&dyn AccountInfo], batch_size: usize) -> Result<u64, Box<dyn std::error::Error>> {
@@ -252,11 +250,11 @@ pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std
     let pool = SqlitePoolOptions::new()
         .min_connections(1)
         .max_connections(5)
-        .after_connect(|conn, _meta| {
+        .after_connect(|conn, meta| {
             let mut sql = post_conn.lock().unwrap().deref().to_string();
             sql.push(';');
 
-            log::debug!("registering schema for conn with sql: {:?} {}", conn, sql);
+            log::debug!("registering schema for conn with sql: {:?}, {:?}, {}", conn, meta, sql);
 
             Box::pin(async move {
                 conn.execute(sql.as_str()).await?;
@@ -270,6 +268,8 @@ pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std
         schemas: schema_cache,
         pool,
     };
+    
+    db.get_tables().await?;
 
     Ok(db)
 }
@@ -284,7 +284,7 @@ mod test {
             .filter_level(log::LevelFilter::Debug)
             .target(env_logger::Target::Stdout)
             .init();
-        
+
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -294,8 +294,6 @@ mod test {
             match open_db("..\\..\\data", &["fund"]).await {
                 Ok(db) => {
                     log::info!("db opened: {:?}", db);
-
-                    log::info!("tables: {:?}", db.get_tables().await.unwrap())
                 }
                 Err(e) => {
                     log::error!("failed to open db: {:?}", e);
