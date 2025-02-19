@@ -101,7 +101,7 @@ impl Schema {
 #[derive(Debug, Clone)]
 pub struct DB
 {
-    schemas: RefCell<HashMap<String, Schema>>,
+    schemas: HashMap<String, Schema>,
     pool: sqlx::SqlitePool,
 }
 
@@ -114,8 +114,8 @@ impl DB {
         todo!()
     }
 
-    async fn get_tables(&self) -> Result<(), Box<dyn std::error::Error>> {
-        for schema in self.schemas.borrow().values() {
+    async fn find_tables(&self) -> Result<(), Box<dyn std::error::Error>> {
+        for schema in self.schemas.values() {
             if !schema.tables.borrow().is_empty() { continue}
 
             let sql = format!("SELECT name, sql FROM {}.sqlite_master WHERE type='table';", schema.name);
@@ -219,26 +219,26 @@ impl DB {
 }
 
 lazy_static! {
-    static ref post_conn: Mutex<String> = Mutex::new(String::new());
+    static ref post_conn_sql: Mutex<String> = Mutex::new(String::new());
 }
 
 pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std::error::Error>> {
-    let schema_cache = RefCell::new(HashMap::with_capacity(schemas.len()));
+    let mut schema_cache = HashMap::with_capacity(schemas.len());
 
     for v in schemas {
         let s = Schema::new(base_dir, v);
 
-        if schema_cache.borrow().contains_key(&s.name) {
+        if schema_cache.contains_key(&s.name) {
             log::warn!("Schema already exists: {}", &s.name);
         } else {
-            schema_cache.borrow_mut().insert(s.name.clone(), s);
+            schema_cache.insert(s.name.clone(), s);
         }
     }
 
 
-    if let Ok(mut sql) = post_conn.lock() {
+    if let Ok(mut sql) = post_conn_sql.lock() {
         if sql.deref() == "" {
-            *sql = schema_cache.clone().borrow().iter().map(
+            *sql = schema_cache.clone().iter().map(
                 |(k, v)| format!("ATTACH DATABASE '{}' AS {}", v.dsn, k)
             ).collect::<Vec<String>>().join("; ")
         } else {
@@ -251,7 +251,7 @@ pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std
         .min_connections(1)
         .max_connections(5)
         .after_connect(|conn, meta| {
-            let mut sql = post_conn.lock().unwrap().deref().to_string();
+            let mut sql = post_conn_sql.lock().unwrap().deref().to_string();
             sql.push(';');
 
             log::debug!("registering schema for conn with sql: {:?}, {:?}, {}", conn, meta, sql);
@@ -269,7 +269,7 @@ pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std
         pool,
     };
     
-    db.get_tables().await?;
+    db.find_tables().await?;
 
     Ok(db)
 }
