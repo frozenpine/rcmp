@@ -1,5 +1,4 @@
 use sqlx::sqlite::SqlitePoolOptions;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -7,7 +6,7 @@ use std::sync::Mutex;
 use lazy_static::lazy_static;
 use sqlx::Executor;
 
-pub trait AccountInfo {
+pub trait AccountInfo: Send + Sync {
     fn get_trading_day(&self) -> String;
     fn get_account_id(&self) -> String;
     fn get_account_name(&self) -> String;
@@ -82,7 +81,6 @@ impl From<&dyn AccountInfo> for DBAccount {
 pub(crate) struct Schema {
     name: String,
     dsn: String,
-    tables: RefCell<Vec<(String, String)>>
 }
 
 impl Schema {
@@ -93,16 +91,17 @@ impl Schema {
         Schema{
             name: name.to_string(),
             dsn: dsn.as_path().to_str().unwrap().to_string(),
-            tables: RefCell::new(Vec::new())
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DB
-{
-    schemas: HashMap<String, Schema>,
-    pool: sqlx::SqlitePool,
+#[derive(Debug)]
+pub struct DB {
+    pool: sqlx::SqlitePool
+}
+
+lazy_static! {
+    static ref post_conn_sql: Mutex<String> = Mutex::new(String::new());
 }
 
 impl DB {
@@ -122,7 +121,7 @@ impl DB {
 
         if let Ok(mut sql) = post_conn_sql.lock() {
             if sql.deref() == "" {
-                *sql = schema_cache.clone().iter().map(
+                *sql = schema_cache.iter().map(
                     |(k, v)| format!("ATTACH DATABASE '{}' AS {}", v.dsn, k)
                 ).collect::<Vec<String>>().join("; ")
             } else {
@@ -149,35 +148,10 @@ impl DB {
             .await?;
 
         let db = Self{
-            schemas: schema_cache,
             pool,
         };
 
-        db.find_tables().await?;
-
         Ok(db)
-    }
-
-    pub async fn migrate(&self) -> Result<(), Box<dyn std::error::Error>> {
-        todo!()
-    }
-
-    async fn find_tables(&self) -> Result<(), Box<dyn std::error::Error>> {
-        for schema in self.schemas.values() {
-            if !schema.tables.borrow().is_empty() { continue}
-
-            let sql = format!("SELECT name, sql FROM {}.sqlite_master WHERE type='table';", schema.name);
-
-            let results: Vec<(String, String)> = sqlx::query_as(&sql)
-                .fetch_all(&self.pool).await?;
-
-            results.iter().for_each(|value| {
-                log::debug!("table in schema[{}]: {}, {:?}", schema.name, schema.dsn, value);
-                schema.tables.borrow_mut().push(value.clone());
-            })
-        }
-
-        Ok(())
     }
 
     pub async fn sink_accounts(&self, accounts: &[&dyn AccountInfo], batch_size: usize) -> Result<u64, Box<dyn std::error::Error>> {
@@ -261,7 +235,16 @@ impl DB {
         Ok(count)
     }
 
+    async fn execute_account_qry(&self, mut qry_builder: sqlx::QueryBuilder<'_, sqlx::Sqlite>) -> Result<Vec<DBAccount>, Box<dyn std::error::Error>> {
+        qry_builder.push(" ORDER BY account_id, trading_day ASC;");
+
+        let query = qry_builder.build_query_as::<DBAccount>();
+        Ok(query.fetch_all(&self.pool).await?)
+    }
+
     pub async fn query_accounts(&self, accounts: &[&str]) -> Result<Vec<DBAccount>, Box<dyn std::error::Error>> {
+        log::info!("querying all accounts data: {:?}", accounts);
+
         let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(r#"SELECT
     trading_day, account_id, account_name,
     balance, frozen_balance, pre_balance,
@@ -269,29 +252,64 @@ impl DB {
     margin, frozen_margin, fee, frozen_fee,
     premium, frozen_premium,
     position_profit, close_profit, net_profit, currency_id
- FROM fund.account WHERE account_id IN"#
+ FROM fund.account WHERE "#
         );
 
-        qry_builder.push_tuples(accounts, |mut b, v| {
-            b.push_bind(*v);
-        });
-        qry_builder.push("ORDER BY account_id, trading_day ASC;");
+        if accounts.is_empty() {
+            qry_builder.push("TRUE");
+        } else {
+            qry_builder.push("account_id IN ")
+                .push_tuples(accounts, |mut b, v| {
+                    b.push_bind(*v);
+                });
+        }
 
-        let query = qry_builder.build_query_as::<DBAccount>();
-        Ok(query.fetch_all(&self.pool).await?)
+        self.execute_account_qry(qry_builder).await
+    }
+
+    pub async fn query_accounts_range(
+        &self, accounts: &[&str], start_date: Option<&str>, end_date: Option<&str>
+    ) -> Result<Vec<DBAccount>, Box<dyn std::error::Error>> {
+        log::info!(
+            "query accounts data between range: {:?}, [{:?}, {:?}]",
+            accounts, start_date, end_date
+        );
+
+        let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(r#"SELECT
+    trading_day, account_id, account_name,
+    balance, frozen_balance, pre_balance,
+    available, deposit, withdraw,
+    margin, frozen_margin, fee, frozen_fee,
+    premium, frozen_premium,
+    position_profit, close_profit, net_profit, currency_id
+ FROM fund.account WHERE "#
+        );
+
+        if !accounts.is_empty() {
+            qry_builder.push("account_id IN ")
+                .push_tuples(accounts, |mut b, v| {
+                    b.push_bind(*v);
+                });
+        } else {
+            qry_builder.push("TRUE");
+        }
+
+        if let Some(start) = start_date {
+            qry_builder.push(" AND trading_day >= ")
+                .push_bind(start);
+        }
+
+        if let Some(end) = end_date {
+            qry_builder.push(" AND trading_day <= ")
+                .push_bind(end);
+        }
+
+        self.execute_account_qry(qry_builder).await
     }
 
     pub fn is_closed(&self) -> bool {
         self.pool.is_closed()
     }
-}
-
-lazy_static! {
-    static ref post_conn_sql: Mutex<String> = Mutex::new(String::new());
-}
-
-pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std::error::Error>> {
-    DB::new(base_dir, schemas).await
 }
 
 #[cfg(test)]
@@ -311,7 +329,7 @@ mod test {
             .unwrap();
 
         rt.block_on(async {
-            match open_db("..\\..\\data", &["fund"]).await {
+            match DB::new("..\\..\\data", &["fund"]).await {
                 Ok(db) => {
                     log::info!("db opened: {:?}", db);
                 }
@@ -334,13 +352,17 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(async {
-            open_db("..\\..\\data", &["fund"]).await
-        }).unwrap();
+        let db = rt.block_on(DB::new("..\\..\\data", &["fund"])).unwrap();
 
-        let result = rt.block_on(async {
-            db.query_accounts(&["880303", "1000008"]).await
-        }).unwrap();
+        let result = rt.block_on(db.query_accounts(&["1000008"])).unwrap();
+
+        for v in result {
+            log::info!("{:?}", v);
+        }
+
+        let result = rt.block_on(db.query_accounts_range(
+            &["880303", "1000008"], Some("20250201"), Some("20250205")))
+            .unwrap();
 
         for v in result {
             log::info!("{:?}", v);

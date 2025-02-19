@@ -31,11 +31,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": []
+    "resources": [
+      "config/config.toml"
+    ]
   },
   "plugins": {
-    "sql": {
-      "preload": ["sqlite:data/fund.db"]
-    }
   }
 }

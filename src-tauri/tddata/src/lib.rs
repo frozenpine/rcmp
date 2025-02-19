@@ -57,17 +57,16 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(async {
-            db::DB::new("../../data", &["fund"]).await.unwrap()
-        });
+        let db = rt.block_on(db::DB::new("../../data", &["fund"]))
+            .unwrap();
 
         log::info!("{:?}", &db);
 
-        let row_count = rt.block_on(async {
-            db.sink_accounts(& accounts.iter().map(
-                |acct| acct as &dyn db::AccountInfo
-            ).collect::<Vec<_>>(), 1000).await.unwrap()
-        });
+        let row_count = rt.block_on(db.sink_accounts(
+            &accounts.iter().map(|v| v as &dyn db::AccountInfo)
+                .collect::<Vec<_>>(),
+            1000,
+        )).unwrap();
 
         log::info!("row affected: {}", row_count);
     }

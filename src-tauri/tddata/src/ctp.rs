@@ -82,7 +82,6 @@ impl Display for PercentValue {
 pub mod tu {
     use super::{CurrencyID, PercentValue, db};
     use std::collections::hash_set;
-    use std::fmt::format;
     use std::io::Read;
 
     #[derive(Debug, Default, serde::Deserialize, serde::Serialize, Clone)]
