@@ -353,7 +353,13 @@ pub mod tu {
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| {
-                !e.file_type().is_dir() && e.file_name().to_str().unwrap_or("").ends_with(".csv")
+                if e.file_type().is_dir() {
+                    return false;
+                }
+
+                let file_name = e.file_name().to_str().unwrap_or("");
+                
+                file_name.ends_with(".csv") && file_name.starts_with("查询资金")
             })
         {
             log::debug!("reading account data from: {:?}", entry);
