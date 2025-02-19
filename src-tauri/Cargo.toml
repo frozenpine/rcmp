@@ -33,6 +33,7 @@ futures = "0.3.31"
 tokio = "1.42.0"
 toml = "0.8.19"
 derivative = "2.2.0"
+tauri-plugin-dialog = "2"
 
 [workspace]
 members = ["tddata"]

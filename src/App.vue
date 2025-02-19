@@ -1,17 +1,36 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from '@tauri-apps/plugin-dialog';
+import {
+  NSpace, NSpin, NInput, NButton,
+} from "naive-ui";
 
 const account_id = ref("");
+const loading = ref(false);
 
-// async function sink_account() {
-//   await invoke("sink_tu_account", {baseDir: "../data", accounts: []})
-//       .then(console.log)
-//       .catch(console.error);
-// }
+async function sink_account() {
+  await open({multiple: false, directory: true})
+      .then(async (dir) => {
+        if (!dir) return;
+
+        loading.value = true;
+        await invoke("sink_tu_account", {baseDir: dir, accounts: []})
+            .then(() => {
+              console.log("all account data sunk finished", dir)
+            })
+            .catch(console.error)
+            .finally(()=>loading.value = false);
+      })
+      .catch(console.error);
+}
 
 async function query_account() {
-  await invoke("query_accounts", {accounts: [account_id.value], startDate: null, endDate: "20250206"})
+  if (!account_id.value) return;
+
+  console.log("querying account data:", account_id.value);
+
+  await invoke("query_accounts", {accounts: [account_id.value], startDate: null, endDate: null})
       .then(console.log)
       .catch(console.error);
 }
@@ -21,22 +40,15 @@ async function query_account() {
   <main class="container">
     <h1>Welcome to RCMP</h1>
 
-    <form class="row" @submit.prevent="query_account">
-      <input v-model="account_id" placeholder="请输入资金账号" />
-      <button type="submit">查询</button>
-    </form>
+    <n-space align="center" justify="center">
+      <n-input type="text" v-model:value="account_id" placeholder="请输入资金账号" clearable />
+      <n-button @click="query_account" :disabled="!account_id" type="info" >查询</n-button>
+      <n-spin :show="loading"><n-button @click="sink_account" type="primary">导入</n-button></n-spin>
+    </n-space>
   </main>
 </template>
 
 <style scoped>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #249b73);
-}
-
 </style>
 <style>
 :root {
@@ -62,17 +74,6 @@ async function query_account() {
   flex-direction: column;
   justify-content: center;
   text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
 }
 
 .row {

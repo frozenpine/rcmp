@@ -1,5 +1,5 @@
-use std::fmt::Display;
 use super::db;
+use std::fmt::Display;
 
 #[derive(Debug, Default, serde::Serialize, Clone)]
 pub enum CurrencyID {
@@ -56,17 +56,17 @@ pub struct PercentValue(f64);
 impl<'de> serde::Deserialize<'de> for PercentValue {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>
+        D: serde::Deserializer<'de>,
     {
         match <f64 as serde::Deserialize>::deserialize(deserializer) {
-            Ok(v) => {Ok(Self(v/100.0))},
-            Err(e) => Err(e)
+            Ok(v) => Ok(Self(v / 100.0)),
+            Err(e) => Err(e),
         }
     }
 
     fn deserialize_in_place<D>(deserializer: D, place: &mut Self) -> Result<(), D::Error>
     where
-        D: serde::Deserializer<'de>
+        D: serde::Deserializer<'de>,
     {
         place.0 = f64::deserialize(deserializer)?;
         Ok(())
@@ -75,12 +75,12 @@ impl<'de> serde::Deserialize<'de> for PercentValue {
 
 impl Display for PercentValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:.2} %", self.0*100.0)
+        write!(f, "{:.2} %", self.0 * 100.0)
     }
 }
 
 pub mod tu {
-    use super::{CurrencyID, PercentValue, db};
+    use super::{db, CurrencyID, PercentValue};
     use std::collections::hash_set;
     use std::io::Read;
 
@@ -248,7 +248,7 @@ pub mod tu {
 
         fn get_net_profit(&self) -> f64 {
             // FIXME: 权利金计算
-            self.position_profit+self.close_profit-self.fee
+            self.position_profit + self.close_profit - self.fee
         }
 
         fn get_currency_id(&self) -> String {
@@ -262,7 +262,8 @@ pub mod tu {
     ) -> Result<Vec<Account>, Box<dyn std::error::Error>> {
         log::debug!(
             "opening csv file for data reading with accounts filter: {:?}, {:?}",
-            file_path, accounts,
+            file_path,
+            accounts,
         );
 
         let f = std::fs::File::open(file_path)?;
@@ -299,7 +300,11 @@ pub mod tu {
             let value = record.iter().nth(1).unwrap_or("");
 
             match name {
-                "标题" => if value != "查询资金" { return Err(format!("invalid account data type: {}", value).into()) },
+                "标题" => {
+                    if value != "查询资金" {
+                        return Err(format!("invalid account data type: {}", value).into());
+                    }
+                }
                 "日期" => {
                     date = String::from(value);
                     log::info!("trading day for account data found: {:?}", date);
@@ -308,7 +313,7 @@ pub mod tu {
                 "查询结果" => {
                     break;
                 }
-                _ => { return Err(format!("unknown account data prefix: {}, {}", name, value).into()) }
+                _ => return Err(format!("unknown account data prefix: {}, {}", name, value).into()),
             }
         }
 
@@ -339,19 +344,18 @@ pub mod tu {
     ) -> Result<Vec<Account>, Box<dyn std::error::Error>> {
         let mut results: Vec<Vec<Account>> = Vec::new();
 
-        if depth < 1 {depth = 1;}
+        if depth < 1 {
+            depth = 1;
+        }
 
         for entry in walkdir::WalkDir::new(base_dir)
             .max_depth(depth)
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| {
-                !e.file_type().is_dir() && e.file_name()
-                    .to_str()
-                    .unwrap_or("")
-                    .ends_with(".csv")
-            }) {
-
+                !e.file_type().is_dir() && e.file_name().to_str().unwrap_or("").ends_with(".csv")
+            })
+        {
             log::debug!("reading account data from: {:?}", entry);
 
             results.push(read_account_csv(entry.path().to_str().unwrap(), accounts)?);
@@ -372,9 +376,8 @@ mod test {
             .target(env_logger::Target::Stdout)
             .init();
 
-        let find_accounts = tu::read_account_csv(
-            "../../data/查询资金2025-02-06.csv", &["880303"])
-            .unwrap();
+        let find_accounts =
+            tu::read_account_csv("../../data/查询资金2025-02-06.csv", &["880303"]).unwrap();
 
         assert_eq!(find_accounts.len(), 1);
         assert_eq!(find_accounts[0].user_id, "880303");
@@ -388,10 +391,8 @@ mod test {
             .target(env_logger::Target::Stdout)
             .init();
 
-        let accounts = tu::read_account_dir(
-            "../../data/", &["880303"], 1,
-        ).unwrap();
-        
+        let accounts = tu::read_account_dir("../../data/", &["880303"], 1).unwrap();
+
         accounts.iter().for_each(|account| {
             log::info!("{:?}", account);
         })

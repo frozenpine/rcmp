@@ -18,7 +18,16 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "dialog",
+          "windows": ["*"],
+          "permissions": [
+            "dialog:allow-open"
+          ]
+        }
+      ]
     }
   },
   "bundle": {
