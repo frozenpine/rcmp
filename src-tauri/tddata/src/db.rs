@@ -29,7 +29,7 @@ pub trait AccountInfo {
     fn get_currency_id(&self) -> String;
 }
 
-#[derive(Debug, Clone, sqlx::FromRow, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, sqlx::FromRow, serde::Serialize, serde::Deserialize)]
 pub struct DBAccount {
     pub trading_day: String,
     pub account_id: String,
@@ -52,8 +52,8 @@ pub struct DBAccount {
     pub currency_id: String,
 }
 
-impl DBAccount {
-    pub fn new(info: Box<dyn AccountInfo>) -> Self {
+impl From<&dyn AccountInfo> for DBAccount {
+    fn from(info: &dyn AccountInfo) -> Self {
         Self{
             trading_day: info.get_trading_day(),
             account_id: info.get_account_id(),
@@ -106,8 +106,56 @@ pub struct DB
 }
 
 impl DB {
-    pub async fn new(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std::error::Error>> {
-        open_db(base_dir, schemas).await
+    pub async fn new(base_dir: &str, schemas: &[&str]) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut schema_cache = HashMap::with_capacity(schemas.len());
+
+        for v in schemas {
+            let s = Schema::new(base_dir, v);
+
+            if schema_cache.contains_key(&s.name) {
+                log::warn!("Schema already exists: {}", &s.name);
+            } else {
+                schema_cache.insert(s.name.clone(), s);
+            }
+        }
+
+
+        if let Ok(mut sql) = post_conn_sql.lock() {
+            if sql.deref() == "" {
+                *sql = schema_cache.clone().iter().map(
+                    |(k, v)| format!("ATTACH DATABASE '{}' AS {}", v.dsn, k)
+                ).collect::<Vec<String>>().join("; ")
+            } else {
+                return Err("db with schemas already opened".into());
+            }
+        }
+
+        // Opening in memory db & attach to file db specified by schemas
+        let pool = SqlitePoolOptions::new()
+            .min_connections(1)
+            .max_connections(5)
+            .after_connect(|conn, meta| {
+                let mut sql = post_conn_sql.lock().unwrap().deref().to_string();
+                sql.push(';');
+
+                log::debug!("registering schema for conn with sql: {:?}, {:?}, {}", conn, meta, sql);
+
+                Box::pin(async move {
+                    conn.execute(sql.as_str()).await?;
+                    Ok(())
+                })
+            })
+            .connect("")
+            .await?;
+
+        let db = Self{
+            schemas: schema_cache,
+            pool,
+        };
+
+        db.find_tables().await?;
+
+        Ok(db)
     }
 
     pub async fn migrate(&self) -> Result<(), Box<dyn std::error::Error>> {
@@ -136,13 +184,13 @@ impl DB {
         log::debug!("sinking for account data: {}", accounts.len());
 
         let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-            "INSERT OR REPLACE INTO fund.account (
-                trading_day, account_id, account_name,
-                balance, frozen_balance, pre_balance,
-                available, deposit, withdraw,
-                margin, frozen_margin, fee, frozen_fee,
-                premium, frozen_premium,
-                position_profit, close_profit, net_profit, currency_id) "
+            r#"INSERT OR REPLACE INTO fund.account (
+    trading_day, account_id, account_name,
+    balance, frozen_balance, pre_balance,
+    available, deposit, withdraw,
+    margin, frozen_margin, fee, frozen_fee,
+    premium, frozen_premium,
+    position_profit, close_profit, net_profit, currency_id)"#
         );
 
         let mut count = 0_u64;
@@ -213,6 +261,26 @@ impl DB {
         Ok(count)
     }
 
+    pub async fn query_accounts(&self, accounts: &[&str]) -> Result<Vec<DBAccount>, Box<dyn std::error::Error>> {
+        let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(r#"SELECT
+    trading_day, account_id, account_name,
+    balance, frozen_balance, pre_balance,
+    available, deposit, withdraw,
+    margin, frozen_margin, fee, frozen_fee,
+    premium, frozen_premium,
+    position_profit, close_profit, net_profit, currency_id
+ FROM fund.account WHERE account_id IN"#
+        );
+
+        qry_builder.push_tuples(accounts, |mut b, v| {
+            b.push_bind(*v);
+        });
+        qry_builder.push("ORDER BY account_id, trading_day ASC;");
+
+        let query = qry_builder.build_query_as::<DBAccount>();
+        Ok(query.fetch_all(&self.pool).await?)
+    }
+
     pub fn is_closed(&self) -> bool {
         self.pool.is_closed()
     }
@@ -223,55 +291,7 @@ lazy_static! {
 }
 
 pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std::error::Error>> {
-    let mut schema_cache = HashMap::with_capacity(schemas.len());
-
-    for v in schemas {
-        let s = Schema::new(base_dir, v);
-
-        if schema_cache.contains_key(&s.name) {
-            log::warn!("Schema already exists: {}", &s.name);
-        } else {
-            schema_cache.insert(s.name.clone(), s);
-        }
-    }
-
-
-    if let Ok(mut sql) = post_conn_sql.lock() {
-        if sql.deref() == "" {
-            *sql = schema_cache.clone().iter().map(
-                |(k, v)| format!("ATTACH DATABASE '{}' AS {}", v.dsn, k)
-            ).collect::<Vec<String>>().join("; ")
-        } else {
-            return Err("db with schemas already opened".into());
-        }
-    }
-
-    // Opening in memory db & attach to file db specified by schemas
-    let pool = SqlitePoolOptions::new()
-        .min_connections(1)
-        .max_connections(5)
-        .after_connect(|conn, meta| {
-            let mut sql = post_conn_sql.lock().unwrap().deref().to_string();
-            sql.push(';');
-
-            log::debug!("registering schema for conn with sql: {:?}, {:?}, {}", conn, meta, sql);
-
-            Box::pin(async move {
-                conn.execute(sql.as_str()).await?;
-                Ok(())
-            })
-        })
-        .connect("")
-        .await?;
-
-    let db = DB{
-        schemas: schema_cache,
-        pool,
-    };
-    
-    db.find_tables().await?;
-
-    Ok(db)
+    DB::new(base_dir, schemas).await
 }
 
 #[cfg(test)]
@@ -300,5 +320,30 @@ mod test {
                 }
             }
         })
+    }
+
+    #[test]
+    fn test_query() {
+        env_logger::Builder::new()
+            .filter_level(log::LevelFilter::Debug)
+            .target(env_logger::Target::Stdout)
+            .init();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let db = rt.block_on(async {
+            open_db("..\\..\\data", &["fund"]).await
+        }).unwrap();
+
+        let result = rt.block_on(async {
+            db.query_accounts(&["880303", "1000008"]).await
+        }).unwrap();
+
+        for v in result {
+            log::info!("{:?}", v);
+        }
     }
 }
