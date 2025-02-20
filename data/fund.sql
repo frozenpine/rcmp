@@ -1,16 +1,16 @@
 /*
  Navicat Premium Dump SQL
 
- Source Server         : fund
+ Source Server         : rcmp
  Source Server Type    : SQLite
  Source Server Version : 3045000 (3.45.0)
- Source Schema         : main
+ Source Schema         : fund
 
  Target Server Type    : SQLite
  Target Server Version : 3045000 (3.45.0)
  File Encoding         : 65001
 
- Date: 19/02/2025 18:37:39
+ Date: 20/02/2025 11:10:59
 */
 
 PRAGMA foreign_keys = false;
