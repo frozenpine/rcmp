@@ -142,7 +142,7 @@ function query_account() {
 
   fund.doQueryAccount(accountID.value)
       .then((accounts) => {
-        data.value = accounts;
+        data.value = accounts.reverse();
       })
       .catch(console.error)
       .finally(() => loading.value = false);
