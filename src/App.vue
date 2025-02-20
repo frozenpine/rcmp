@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, h } from "vue";
+import {ref, h, reactive, computed} from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from '@tauri-apps/plugin-dialog';
 import { useOsTheme, darkTheme, dateZhCN, zhCN } from 'naive-ui'
@@ -54,11 +54,40 @@ const columns: DataTableColumns<DBAccount> = [
   {title: "币种", key: "currency_id"}
 ]
 
+const defaultPageSizes = [5, 10, 15, 50];
+
+const pageSizes = computed(()=>{
+  if (data.value.length < 1) {
+    return defaultPageSizes;
+  }
+
+  let idx = 0;
+
+  for (; idx < defaultPageSizes.length; idx++) {
+    if (defaultPageSizes[idx] > data.value.length) {
+      break;
+    }
+  }
+
+  return defaultPageSizes.slice(0, idx).concat([data.value.length]);
+})
+
 const osTheme = useOsTheme();
 const account_id = ref("");
 const parsing = ref(false);
 const loading = ref(false);
 const data = ref<DBAccount[]>([]);
+const pagination = reactive({
+  page: 1,
+  pageSize: 5,
+  showSizePicker: true,
+  pageSizes: pageSizes,
+  onChange: (page: number) => {pagination.page = page},
+  onUpdatePageSize: (pageSize: number) => {
+    pagination.pageSize = pageSize;
+    pagination.page = 1;
+  }
+})
 
 async function sink_account() {
   await open({multiple: false, directory: true})
@@ -85,6 +114,7 @@ async function query_account() {
   await invoke("query_accounts", {accounts: [account_id.value], startDate: null, endDate: null})
       .then((values) => {
         data.value = values as DBAccount[];
+
         console.log(values);
       })
       .catch(console.error)
@@ -123,7 +153,7 @@ const getRowKey = (row: any): string => {
           </n-space>
         </n-card>
       </n-space>
-      <n-data-table :columns="columns" :data="data" :loading="loading" :row-key="getRowKey"></n-data-table>
+      <n-data-table :columns="columns" :data="data" :loading="loading" :row-key="getRowKey" :pagination="pagination" striped ></n-data-table>
     </n-space>
   </n-config-provider>
 </template>
