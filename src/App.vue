@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import {ref, h, reactive, computed} from "vue";
+import { ref, h, reactive, computed, nextTick } from "vue";
 import { open } from '@tauri-apps/plugin-dialog';
 import { useOsTheme, darkTheme, dateZhCN, zhCN } from 'naive-ui'
 import {
   NConfigProvider,
   NSpace, NSpin, NInput, NButton, NCard, NIcon, NButtonGroup,
   NForm, NFormItem,
-  NDataTable,
+  NDataTable, NDropdown
 } from "naive-ui";
-import type { DataTableColumns } from 'naive-ui'
+import type { DataTableColumns, DataTableInst } from 'naive-ui'
 import { Search, DatabaseImport, Folder } from "@vicons/tabler"
 import { FileCsv } from "@vicons/fa"
 
@@ -107,7 +107,9 @@ const pagination = reactive({
     pagination.pageSize = pageSize;
     pagination.page = 1;
   }
-})
+});
+const dt = ref<DataTableInst>();
+const menu = ref<{x: number; y: number; show: boolean}>({x: 0, y: 0, show: false});
 
 async function sink_account(dir: boolean = false) {
   const source = dir? await open({
@@ -146,10 +148,58 @@ function query_account() {
       .finally(() => loading.value = false);
 }
 
+function handleMenuSelect(sel: string) {
+  menu.value.show = false;
+
+  switch (sel) {
+    case "all": {
+      const {page, pageSize} = pagination;
+      pagination.pageSize = pagination.pageSizes[pagination.pageSizes.length - 1];
+      pagination.page = 1;
+
+      nextTick().then(()=>{
+        dt.value?.downloadCsv({
+          fileName: `account_${accountID.value}_all.csv`,
+        });
+
+        pagination.pageSize = pageSize;
+        pagination.page = page;
+      })
+      break;
+    }
+    case "page": {
+      dt.value?.downloadCsv({
+        fileName: `account_${accountID.value}_partial.csv`,
+        keepOriginalData: false,
+      })
+      break;
+    }
+    default: {
+      console.error("unsupported menu item:", sel);
+      break;
+    }
+  }
+}
+
 const getRowKey = (row: any): string => {
   const data = row as DBAccount;
   return [data.trading_day, data.account_id, data.currency_id].join(".")
 }
+
+const rowProps = (_: DBAccount) => {
+  return {
+    onContextmenu: (e: MouseEvent) => {
+      e.preventDefault()
+      menu.value.show = false;
+      nextTick().then(() => {
+        menu.value.show = true;
+        menu.value.x = e.clientX;
+        menu.value.y = e.clientY;
+      })
+    }
+  }
+}
+
 </script>
 
 <template>
@@ -189,9 +239,12 @@ const getRowKey = (row: any): string => {
           </n-form>
         </n-card>
       </n-space>
-      <n-data-table :columns="columns" :data="data" :loading="loading"
-                    :row-key="getRowKey" :pagination="pagination"
+      <n-data-table ref="dt" :columns="columns" :data="data" :loading="loading"
+                    :row-key="getRowKey" :pagination="pagination" :row-props="rowProps"
                     striped ></n-data-table>
+      <n-dropdown placement="bottom-start" trigger="manual" :x="menu.x" :y="menu.y" :show="menu.show"
+                  :on-clickoutside="() => menu.show = false" @select="handleMenuSelect"
+                  :options="[{label: '导出全部', key: 'all'}, {label: '导出当前', key: 'page'}]"></n-dropdown>
     </n-space>
   </n-config-provider>
 </template>
