@@ -5,31 +5,57 @@ use derivative::Derivative;
 use futures::lock::Mutex;
 use tauri::path::BaseDirectory;
 use tauri::{Manager, State};
-use tddata::db::AccountInfo;
+use tddata::{db, ctp::tu};
+
+async fn sink_tu_accounts(
+    db: &db::DB, accounts: Vec<tu::Account>,
+) -> Result<u64, String> {
+    db.sink_accounts(
+        accounts
+            .iter()
+            .map(|s| s as &dyn db::AccountInfo)
+            .collect::<Vec<_>>()
+            .as_slice(),
+        1000,
+    )
+        .await
+        .map_err(|e| e.to_string())
+}
 
 #[tauri::command]
-async fn sink_tu_account(
-    base_dir: &str,
-    accounts: Vec<&str>,
-    state: State<'_, Mutex<Config>>,
+async fn sink_tu_account_dir(
+    base_dir: &str, accounts: Vec<&str>, state: State<'_, Mutex<Config>>,
 ) -> Result<u64, String> {
     let cfg = state.lock().await;
 
     match cfg._db.as_ref() {
         Some(db) => {
-            let accounts = tddata::ctp::tu::read_account_dir(base_dir, &accounts, 1)
+            let accounts = tu::read_account_dir(base_dir, &accounts, 1)
                 .map_err(|e| e.to_string())?;
 
-            Ok(db.sink_accounts(
-                accounts
-                    .iter()
-                    .map(|s| s as &dyn AccountInfo)
-                    .collect::<Vec<_>>()
-                    .as_slice(),
-                1000,
-            )
-            .await
-            .map_err(|e| e.to_string())?)
+            sink_tu_accounts(db, accounts).await
+        }
+        None => Err("no database initialized.".into())
+    }
+}
+
+#[tauri::command]
+async fn sink_tu_account_files(
+    csv_files: Vec<&str>, accounts: Vec<&str>, state: State<'_, Mutex<Config>>
+) -> Result<u64, String> {
+    let cfg = state.lock().await;
+
+    match cfg._db.as_ref() {
+        Some(db) => {
+            let mut data: Vec<Vec<tu::Account>> = Vec::with_capacity(csv_files.len());
+
+            for file in csv_files {
+                let accounts = tu::read_account_csv(file, &accounts)
+                    .map_err(|e| e.to_string())?;
+                data.push(accounts);
+            }
+
+            sink_tu_accounts(db, data.concat()).await
         }
         None => Err("no database initialized.".into())
     }
@@ -79,7 +105,7 @@ pub fn run() {
 
             let mut cfg: Config = toml::from_str(&cfg_file)?;
 
-            let db = tauri::async_runtime::block_on(tddata::db::DB::new(
+            let db = tauri::async_runtime::block_on(db::DB::new(
                 &cfg.data_base,
                 &cfg.schemas
                     .iter()
@@ -119,7 +145,11 @@ pub fn run() {
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![sink_tu_account, query_accounts,])
+        .invoke_handler(tauri::generate_handler![
+            sink_tu_account_dir,
+            sink_tu_account_files,
+            query_accounts,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

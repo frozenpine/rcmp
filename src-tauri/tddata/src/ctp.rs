@@ -89,6 +89,9 @@ pub mod tu {
         #[serde(default, alias = "交易日")]
         pub trading_day: String,
 
+        #[serde(default, alias = "经纪商代码")]
+        pub broker_id: String,
+
         #[serde(alias = "投资者帐号")]
         pub user_id: String,
 
@@ -181,6 +184,8 @@ pub mod tu {
         fn get_trading_day(&self) -> String {
             self.trading_day.clone()
         }
+        
+        fn get_broker_id(&self) -> String {self.broker_id.clone()}
 
         fn get_account_id(&self) -> String {
             self.user_id.clone()
@@ -279,6 +284,7 @@ pub mod tu {
             .from_reader(data.as_slice());
 
         let mut date: String = String::from("");
+        let mut broker_id: String = String::from("");
 
         let mut acct_cache = hash_set::HashSet::with_capacity(accounts.len());
 
@@ -309,7 +315,11 @@ pub mod tu {
                     date = String::from(value);
                     log::info!("trading day for account data found: {:?}", date);
                 }
-                "查询参数" | "BrokerID" | "UserID" => {}
+                "BrokerID" => {
+                    broker_id = String::from(value);
+                    log::info!("broker_id for account data found: {:?}", broker_id);
+                }
+                "查询参数" | "UserID" => {}
                 "查询结果" => {
                     break;
                 }
@@ -327,6 +337,7 @@ pub mod tu {
                 Ok(mut v) => {
                     if acct_cache.is_empty() || acct_cache.contains(v.user_id.as_str()) {
                         v.trading_day = date.clone();
+                        v.broker_id = broker_id.clone();
                         Some(v)
                     } else {
                         None

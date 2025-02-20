@@ -1,57 +1,77 @@
 <script setup lang="ts">
 import {ref, h, reactive, computed} from "vue";
-import { invoke } from "@tauri-apps/api/core";
 import { open } from '@tauri-apps/plugin-dialog';
 import { useOsTheme, darkTheme, dateZhCN, zhCN } from 'naive-ui'
 import {
   NConfigProvider,
-  NSpace, NSpin, NInput, NButton, NCard, NIcon,
+  NSpace, NSpin, NInput, NButton, NCard, NIcon, NButtonGroup,
+  NForm, NFormItem,
   NDataTable,
 } from "naive-ui";
 import type { DataTableColumns } from 'naive-ui'
-import {Search, DatabaseImport} from "@vicons/tabler"
+import { Search, DatabaseImport, Folder } from "@vicons/tabler"
+import { FileCsv } from "@vicons/fa"
 
-import {CurrencyFormatter} from "./utils/formatter.ts";
-
-interface DBAccount {
-  trading_day: string;
-  account_id: string;
-  account_name?: string;
-  balance: number;
-  frozen_balance: number;
-  pre_balance: number;
-  available: number;
-  deposit: number;
-  withdrawal: number;
-  margin: number;
-  frozen_margin: number;
-  fee: number;
-  frozen_fee: number;
-  position_profit: number;
-  close_profit: number;
-  net_profit: number;
-  currency_id: string;
-}
+import { CurrencyFormatter } from "./utils/formatter.ts";
+import { DBAccount } from "./models/db.ts"
+import { fundStore} from "./store/fund.ts";
 
 const fmt = CurrencyFormatter();
+const fund = fundStore();
 
 const columns: DataTableColumns<DBAccount> = [
-  {title: "交易日", key: "trading_day"},
-  {title: "资金账号", key: "account_id"},
-  {title: "账号名称", key: "account_name"},
-  {title: "昨权益", key: "pre_balance",
-    render(row) {return h("label", fmt(row.pre_balance))}},
-  {title: "今权益", key: "balance",
-    render(row) {return h("label", fmt(row.balance))}},
-  {title: "持仓盈亏", key: "position_profit",
-    render(row) {return h("label", fmt(row.position_profit))}},
-  {title: "平仓盈亏", key: "close_profit",
-    render(row) {return h("label", fmt(row.close_profit))}},
-  {title: "手续费", key: "fee",
-    render(row) {return h("label", fmt(row.fee))}},
-  {title: "净盈亏", key: "net_profit",
-    render(row) {return h("label", fmt(row.net_profit))}},
-  {title: "币种", key: "currency_id"}
+  {title: "交易日", key: "trading_day", fixed: "left", width: 100},
+  {title: "资金账号", key: "account_id", fixed: "left", width: 100},
+  {title: "账号名称", key: "account_name", fixed: "left", width: 100},
+  {
+    title: "昨权益", key: "pre_balance",
+    render(row) {return h("label", fmt(row.pre_balance))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  },
+  {
+    title: "今权益", key: "balance",
+    render(row) {return h("label", fmt(row.balance))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  },
+  {
+    title: "持仓盈亏", key: "position_profit",
+    render(row) {return h("label", fmt(row.position_profit))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  },
+  {
+    title: "平仓盈亏", key: "close_profit",
+    render(row) {return h("label", fmt(row.close_profit))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  },
+  {
+    title: "手续费", key: "fee",
+    render(row) {return h("label", fmt(row.fee))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  },
+  {
+    title: "净盈亏", key: "net_profit",
+    render(row) {return h("label", fmt(row.net_profit))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  },
+  {title: "币种", key: "currency_id", fixed: "right", width: 60},
 ]
 
 const defaultPageSizes = [5, 10, 15, 50];
@@ -73,7 +93,7 @@ const pageSizes = computed(()=>{
 })
 
 const osTheme = useOsTheme();
-const account_id = ref("");
+const accountID = ref("");
 const parsing = ref(false);
 const loading = ref(false);
 const data = ref<DBAccount[]>([]);
@@ -89,36 +109,41 @@ const pagination = reactive({
   }
 })
 
-async function sink_account() {
-  await open({multiple: false, directory: true})
-      .then(async (dir) => {
-        if (!dir) return;
+async function sink_account(dir: boolean = false) {
+  const source = dir? await open({
+    title: "文件夹导入",
+    multiple: false,
+    directory: true,
+  }) : await open({
+    title: "文件导入",
+    multiple: true,
+    directory: false,
+    filters: [{name: "查询资金", extensions: ["csv"]}],
+  });
 
-        parsing.value = true;
-        await invoke("sink_tu_account", {baseDir: dir, accounts: []})
-            .then((count) => {
-              console.log("all account data sunk finished", dir, count)
-            })
-            .catch(console.error)
-            .finally(()=>parsing.value = false);
-      })
-      .catch(console.error);
-}
+  if (!source) return;
 
-async function query_account() {
-  if (!account_id.value) return;
-
-  console.log("querying account data:", account_id.value);
-  loading.value = true;
-
-  await invoke("query_accounts", {accounts: [account_id.value], startDate: null, endDate: null})
-      .then((values) => {
-        data.value = values as DBAccount[];
-
-        console.log(values);
+  parsing.value = true;
+  fund.doSinkTuAccount(source)
+      .then(count => {
+        console.log("all account data sunk finished", source, count)
       })
       .catch(console.error)
-      .finally(()=> loading.value = false);
+      .finally(() => {parsing.value = false;});
+}
+
+function query_account() {
+  if (!accountID.value) return;
+
+  console.log("querying account data:", accountID.value);
+  loading.value = true;
+
+  fund.doQueryAccount(accountID.value)
+      .then((accounts) => {
+        data.value = accounts;
+      })
+      .catch(console.error)
+      .finally(() => loading.value = false);
 }
 
 const getRowKey = (row: any): string => {
@@ -131,34 +156,51 @@ const getRowKey = (row: any): string => {
   <n-config-provider :theme="osTheme==='dark'? darkTheme : null" :locale="zhCN" :date-locale="dateZhCN">
     <n-space vertical class="container">
       <n-space align="center" justify="center">
-        <n-card title="Welcome to RCMP" size="huge">
+        <n-card title="Welcome to RCMP" size="huge" hoverable >
           <template #header-extra>
             <n-spin size="small" :show="parsing">
-              <n-button @click="sink_account" size="small" quaternary round >
-                <template #icon>
-                  <n-icon><DatabaseImport/></n-icon>
-                </template>
-                导入
-              </n-button>
+              <n-icon style="margin-right: 5px" size="15"><DatabaseImport/></n-icon>
+              <n-button-group size="tiny" :disabled="parsing">
+                <n-button @click="()=> sink_account(true)" ghost round >
+                  <template #icon>
+                    <n-icon><Folder/></n-icon>
+                  </template>
+                </n-button>
+                <n-button @click="()=> sink_account(false)" ghost round >
+                  <template #icon>
+                    <n-icon><FileCsv/></n-icon>
+                  </template>
+                </n-button>
+              </n-button-group>
             </n-spin>
           </template>
-          <n-space align="center" justify="center">
-            <n-input type="text" v-model:value="account_id" placeholder="请输入资金账号" clearable />
-            <n-button @click="query_account" :disabled="!account_id" type="info" >
-              <template #icon>
-                <n-icon><Search/></n-icon>
-              </template>
-              查询
-            </n-button>
-          </n-space>
+          <n-form justify="center" :disabled="loading" inline>
+            <n-form-item>
+              <n-input v-model:value="accountID" placeholder="请输入资金账号" clearable />
+            </n-form-item>
+            <n-form-item>
+              <n-button attr-type="submit" @click="query_account" :disabled="!accountID" type="info" >
+                <template #icon>
+                  <n-icon><Search/></n-icon>
+                </template>
+                查询
+              </n-button>
+            </n-form-item>
+          </n-form>
         </n-card>
       </n-space>
-      <n-data-table :columns="columns" :data="data" :loading="loading" :row-key="getRowKey" :pagination="pagination" striped ></n-data-table>
+      <n-data-table :columns="columns" :data="data" :loading="loading"
+                    :row-key="getRowKey" :pagination="pagination"
+                    striped ></n-data-table>
     </n-space>
   </n-config-provider>
 </template>
 
 <style scoped>
+.n-card {
+  min-width: 400px;
+  background: transparent;
+}
 </style>
 <style>
 :root {

@@ -8,6 +8,7 @@ use std::sync::Mutex;
 
 pub trait AccountInfo: Send + Sync {
     fn get_trading_day(&self) -> String;
+    fn get_broker_id(&self) -> String;
     fn get_account_id(&self) -> String;
     fn get_account_name(&self) -> String;
     fn get_balance(&self) -> f64;
@@ -31,6 +32,7 @@ pub trait AccountInfo: Send + Sync {
 #[derive(Debug, Clone, Default, sqlx::FromRow, serde::Serialize, serde::Deserialize)]
 pub struct DBAccount {
     pub trading_day: String,
+    pub broker_id: String,
     pub account_id: String,
     pub account_name: String,
     pub balance: f64,
@@ -55,6 +57,7 @@ impl From<&dyn AccountInfo> for DBAccount {
     fn from(info: &dyn AccountInfo) -> Self {
         Self {
             trading_day: info.get_trading_day(),
+            broker_id: info.get_broker_id(),
             account_id: info.get_account_id(),
             account_name: info.get_account_name(),
             balance: info.get_balance(),
@@ -167,7 +170,7 @@ impl DB {
 
         let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             r#"INSERT OR REPLACE INTO fund.account (
-    trading_day, account_id, account_name,
+    trading_day, broker_id, account_id, account_name,
     balance, frozen_balance, pre_balance,
     available, deposit, withdraw,
     margin, frozen_margin, fee, frozen_fee,
@@ -190,6 +193,7 @@ impl DB {
                 leading.iter().map(|acct| {
                     (
                         acct.get_trading_day(),
+                        acct.get_broker_id(),
                         acct.get_account_id(),
                         acct.get_account_name(),
                         acct.get_balance(),
@@ -229,7 +233,8 @@ impl DB {
                         .push_bind(values.15)
                         .push_bind(values.16)
                         .push_bind(values.17)
-                        .push_bind(values.18);
+                        .push_bind(values.18)
+                        .push_bind(values.19);
                 },
             );
 
@@ -266,7 +271,7 @@ impl DB {
 
         let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             r#"SELECT
-    trading_day, account_id, account_name,
+    trading_day, broker_id, account_id, account_name,
     balance, frozen_balance, pre_balance,
     available, deposit, withdraw,
     margin, frozen_margin, fee, frozen_fee,
@@ -303,7 +308,7 @@ impl DB {
 
         let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             r#"SELECT
-    trading_day, account_id, account_name,
+    trading_day, broker_id, account_id, account_name,
     balance, frozen_balance, pre_balance,
     available, deposit, withdraw,
     margin, frozen_margin, fee, frozen_fee,
