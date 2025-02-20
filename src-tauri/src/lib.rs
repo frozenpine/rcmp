@@ -12,7 +12,7 @@ async fn sink_tu_account(
     base_dir: &str,
     accounts: Vec<&str>,
     state: State<'_, Mutex<Config>>,
-) -> Result<(), String> {
+) -> Result<u64, String> {
     let cfg = state.lock().await;
 
     match cfg._db.as_ref() {
@@ -20,7 +20,7 @@ async fn sink_tu_account(
             let accounts = tddata::ctp::tu::read_account_dir(base_dir, &accounts, 1)
                 .map_err(|e| e.to_string())?;
 
-            db.sink_accounts(
+            Ok(db.sink_accounts(
                 accounts
                     .iter()
                     .map(|s| s as &dyn AccountInfo)
@@ -29,12 +29,10 @@ async fn sink_tu_account(
                 1000,
             )
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?)
         }
-        None => return Err("no database initialized.".into()),
+        None => Err("no database initialized.".into())
     }
-
-    Ok(())
 }
 
 #[tauri::command]
