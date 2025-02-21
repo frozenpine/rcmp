@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import {type DataTableColumns, type DataTableInst, NDataTable, NDropdown} from "naive-ui";
+import {
+  type DataTableColumns, type DataTableInst,
+  NDataTable, NDropdown, NWatermark,
+} from "naive-ui";
 import {computed, h, nextTick, reactive, ref} from "vue";
 import dayjs from "dayjs";
 
@@ -163,9 +166,19 @@ const rowProps = (_: DBAccount) => {
 </script>
 
 <template>
-  <n-data-table ref="dt" :columns="defaultColumns" :data="data" :loading="loading"
-                :row-key="getRowKey" :pagination="pagination" :row-props="rowProps"
-                striped ></n-data-table>
+  <n-watermark content="瑞达期货"
+               :font-size="16"
+               :line-height="16"
+               :width="192"
+               :height="128"
+               :x-offset="12"
+               :y-offset="28"
+               :rotate="-15"
+               cross selectable>
+    <n-data-table ref="dt" :columns="defaultColumns" :data="data" :loading="loading"
+                  :row-key="getRowKey" :pagination="pagination" :row-props="rowProps"
+                  striped ></n-data-table>
+  </n-watermark>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
               :on-clickoutside="() => contextMenu.show = false" @select="handleMenuSelect"
               :options="[{label: '导出全部', key: 'all'}, {label: '导出当前', key: 'page'}]"></n-dropdown>
