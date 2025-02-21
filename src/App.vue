@@ -2,15 +2,15 @@
 import { ref } from "vue";
 import { useOsTheme, darkTheme, dateZhCN, zhCN } from 'naive-ui'
 import {
-  NConfigProvider, NMessageProvider,
+  NConfigProvider, NMessageProvider, NBackTop,
   NSpace, NInput, NButton, NCard, NIcon,
   NForm, NFormItem,
 } from "naive-ui";
-import { Search } from "@vicons/tabler"
+import { Search, ArrowBigUpLine } from "@vicons/tabler"
 
 import Feedback from "./components/Feedback.vue"
 import AccountTable from "./components/AccountTable.vue"
-import TUSinker from "./components/TUSinker.vue"
+import TUAccountSinker from "./components/TUAccountSinker.vue"
 
 import { DBAccount } from "./models/db.ts"
 import { fundStore } from "./store/fund.ts";
@@ -44,9 +44,9 @@ function query_account() {
       <n-space align="center" justify="center">
         <n-card title="Welcome to RCMP" size="huge" hoverable >
           <template #header-extra>
-            <TUSinker/>
+            <TUAccountSinker />
           </template>
-          <n-form justify="center" :disabled="loading" inline>
+          <n-form class="query" :disabled="loading" inline>
             <n-form-item>
               <n-input v-model:value="accountID" placeholder="请输入资金账号" clearable />
             </n-form-item>
@@ -63,6 +63,7 @@ function query_account() {
       </n-space>
       <AccountTable :data="data" :loading="loading" />
     </n-space>
+    <n-back-top :style="{zIndex: 999}"><n-icon size="20"><ArrowBigUpLine/></n-icon></n-back-top>
   </n-config-provider>
 </template>
 
@@ -70,6 +71,9 @@ function query_account() {
 .n-card {
   min-width: 400px;
   background: transparent;
+}
+.query {
+  justify-content: center;
 }
 </style>
 <style>

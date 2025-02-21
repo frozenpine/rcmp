@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import {DatabaseImport, Folder} from "@vicons/tabler";
-import {NButton, NButtonGroup, NIcon, NSpin} from "naive-ui";
+import {NButton, NButtonGroup, NIcon, NSpin, NSpace} from "naive-ui";
 import {FileCsv} from "@vicons/fa";
 import {ref} from "vue";
 import {open} from "@tauri-apps/plugin-dialog";
 import {useMessage} from "../utils/feedback.ts";
 import {fundStore} from "../store/fund.ts";
+
+const {
+  fromDir = true, fromFiles = true
+} = defineProps<{fromDir?: boolean, fromFiles?: boolean}>();
 
 const fund = fundStore();
 const message = useMessage();
@@ -39,19 +43,21 @@ async function sink_account(dir: boolean = false) {
 
 <template>
   <n-spin size="small" :show="parsing">
-    <n-icon style="margin-right: 5px" size="15"><DatabaseImport/></n-icon>
-    <n-button-group size="tiny" :disabled="parsing">
-      <n-button @click="()=> sink_account(true)" ghost round >
-        <template #icon>
-          <n-icon><Folder/></n-icon>
-        </template>
-      </n-button>
-      <n-button @click="()=> sink_account(false)" ghost round >
-        <template #icon>
-          <n-icon><FileCsv/></n-icon>
-        </template>
-      </n-button>
-    </n-button-group>
+    <n-space align="baseline" inline>
+      <n-icon style="margin-right: 5px" size="20"><DatabaseImport/></n-icon>
+      <n-button-group size="small" :disabled="parsing">
+        <n-button @click="()=> sink_account(true)" ghost round v-if="fromDir" >
+          <template #icon>
+            <n-icon><Folder/></n-icon>
+          </template>
+        </n-button>
+        <n-button @click="()=> sink_account(false)" ghost round v-if="fromFiles || (!fromDir && !fromFiles)">
+          <template #icon>
+            <n-icon><FileCsv/></n-icon>
+          </template>
+        </n-button>
+      </n-button-group>
+    </n-space>
   </n-spin>
 </template>
 
