@@ -11,7 +11,7 @@ export const fundStore = defineStore("fund", {
     },
     actions: {
         async doQueryAccount(
-            data: string | string[], {
+            accountID: string, {
                 startDate,
                 endDate,
                 force = false,
@@ -22,31 +22,17 @@ export const fundStore = defineStore("fund", {
             } = {},
         ): Promise<Array<DBAccount>> {
             return new Promise((resolve, reject) => {
-                if (!data) { reject("query account is required"); }
+                if (!accountID) { reject("query account is required"); }
 
-                const accounts = Array.isArray(data)? data : [data];
-                const accountSet = new Set<string>(accounts);
+                if (!force && !startDate && !endDate && this.accounts.has(accountID)) {
+                    console.log("query account hit data cache:", accountID);
 
-                if (!force && !startDate && !endDate) {
-                    [...this.accounts.keys()].forEach((idt) => {
-                        accountSet.delete(idt);
-                    })
-                }
-
-                if (accountSet.size <= 0) {
-                    console.log("query account hit data cache:", data);
-                    const result: Array<DBAccount> = [];
-
-                    accounts.forEach((v) => {
-                        result.push(...this.accounts.get(v)!)
-                    })
-
-                    resolve(result)
+                    resolve(this.accounts.get(accountID)!)
                 } else {
-                    console.log("query account from database:", data);
+                    console.log("query account from database:", accountID);
 
                     invoke("query_accounts", {
-                        accounts: [...accountSet],
+                        accounts: [accountID],
                         startDate: startDate,
                         endDate: endDate,
                     }).then((values) => {
