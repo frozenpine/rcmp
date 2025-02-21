@@ -33,7 +33,13 @@ export const metaStore = defineStore("meta", {
         }
     },
     actions: {
-        async doQueryInvestors(all: boolean, force: boolean = false): Promise<Array<DBInvestor>> {
+        async doQueryInvestors(
+            all: boolean, {
+                force = false,
+            }: {
+                force?: boolean
+            } = {},
+        ): Promise<Array<DBInvestor>> {
             return new Promise((resolve, _) => {
                 if (this.investors.size > 0 && !force) {
                     console.log("query investor hit data cache:", all);

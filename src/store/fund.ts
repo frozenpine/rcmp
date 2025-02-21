@@ -11,10 +11,15 @@ export const fundStore = defineStore("fund", {
     },
     actions: {
         async doQueryAccount(
-            data: string | string[],
-            startDate: string | undefined = undefined,
-            endDate: string | undefined = undefined,
-            force: boolean = false,
+            data: string | string[], {
+                startDate,
+                endDate,
+                force = false,
+            }: {
+                startDate?: string
+                endDate?: string
+                force?: boolean
+            } = {},
         ): Promise<Array<DBAccount>> {
             return new Promise((resolve, reject) => {
                 if (!data) { reject("query account is required"); }
@@ -61,8 +66,9 @@ export const fundStore = defineStore("fund", {
             })
         },
         async doSinkTuAccount(
-            source: string | string[],
-            accounts: string[] | undefined = undefined,
+            source: string | string[], {
+                accounts
+            }: {accounts?: string[]} = {},
         ): Promise<number> {
             const sinker = Array.isArray(source) ? () => invoke(
                 "sink_tu_account_files", {
