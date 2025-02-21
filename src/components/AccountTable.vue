@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 
 import {DBAccount} from "../models/db.ts";
 import {CurrencyFormatter} from "../utils/formatter.ts";
+import {useMessage} from "../utils/feedback.ts";
 
 interface AccountTableProps {
   loading?: boolean;
@@ -19,6 +20,7 @@ const {
 } = defineProps<AccountTableProps>();
 
 const fmt = CurrencyFormatter();
+const message = useMessage();
 
 const defaultColumns: DataTableColumns<DBAccount> = [
   {title: "交易日", key: "trading_day", fixed: "left", width: 100, titleAlign: "center"},
@@ -134,6 +136,7 @@ function handleMenuSelect(sel: string) {
     }
     default: {
       console.error("unsupported menu item:", sel);
+      message.error(`尚未支持【${sel}】该菜单选项`);
       break;
     }
   }

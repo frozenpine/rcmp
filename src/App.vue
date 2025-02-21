@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { open } from '@tauri-apps/plugin-dialog';
 import { useOsTheme, darkTheme, dateZhCN, zhCN } from 'naive-ui'
 import {
-  NConfigProvider,
-  NSpace, NSpin, NInput, NButton, NCard, NIcon, NButtonGroup,
+  NConfigProvider, NMessageProvider,
+  NSpace, NInput, NButton, NCard, NIcon,
   NForm, NFormItem,
 } from "naive-ui";
-import { Search, DatabaseImport, Folder } from "@vicons/tabler"
-import { FileCsv } from "@vicons/fa"
+import { Search } from "@vicons/tabler"
 
+import Feedback from "./components/Feedback.vue"
 import AccountTable from "./components/AccountTable.vue"
+import TUSinker from "./components/TUSinker.vue"
 
 import { DBAccount } from "./models/db.ts"
 import { fundStore } from "./store/fund.ts";
@@ -19,32 +19,8 @@ const fund = fundStore();
 
 const osTheme = useOsTheme();
 const accountID = ref("");
-const parsing = ref(false);
 const loading = ref(false);
 const data = ref<DBAccount[]>([]);
-
-async function sink_account(dir: boolean = false) {
-  const source = dir? await open({
-    title: "文件夹导入",
-    multiple: false,
-    directory: true,
-  }) : await open({
-    title: "文件导入",
-    multiple: true,
-    directory: false,
-    filters: [{name: "查询资金", extensions: ["csv"]}],
-  });
-
-  if (!source) return;
-
-  parsing.value = true;
-  fund.doSinkTuAccount(source)
-      .then(count => {
-        console.log("all account data sunk finished", source, count)
-      })
-      .catch(console.error)
-      .finally(() => {parsing.value = false;});
-}
 
 function query_account() {
   if (!accountID.value) return;
@@ -63,25 +39,12 @@ function query_account() {
 
 <template>
   <n-config-provider :theme="osTheme==='dark'? darkTheme : null" :locale="zhCN" :date-locale="dateZhCN">
+    <n-message-provider><Feedback/></n-message-provider>
     <n-space vertical class="container">
       <n-space align="center" justify="center">
         <n-card title="Welcome to RCMP" size="huge" hoverable >
           <template #header-extra>
-            <n-spin size="small" :show="parsing">
-              <n-icon style="margin-right: 5px" size="15"><DatabaseImport/></n-icon>
-              <n-button-group size="tiny" :disabled="parsing">
-                <n-button @click="()=> sink_account(true)" ghost round >
-                  <template #icon>
-                    <n-icon><Folder/></n-icon>
-                  </template>
-                </n-button>
-                <n-button @click="()=> sink_account(false)" ghost round >
-                  <template #icon>
-                    <n-icon><FileCsv/></n-icon>
-                  </template>
-                </n-button>
-              </n-button-group>
-            </n-spin>
+            <TUSinker/>
           </template>
           <n-form justify="center" :disabled="loading" inline>
             <n-form-item>
