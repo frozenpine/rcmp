@@ -40,7 +40,7 @@ export const metaStore = defineStore("meta", {
                 force?: boolean
             } = {},
         ): Promise<Array<DBInvestor>> {
-            return new Promise((resolve, _) => {
+            return new Promise((resolve, reject) => {
                 if (this.investors.size > 0 && !force) {
                     console.log("query investor hit data cache:", all);
 
@@ -70,7 +70,7 @@ export const metaStore = defineStore("meta", {
                         })
 
                         resolve(investors)
-                    });
+                    }).catch(reject);
                 }
             });
         }

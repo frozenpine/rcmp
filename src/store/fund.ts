@@ -47,7 +47,7 @@ export const fundStore = defineStore("fund", {
                         })
 
                         resolve(accounts);
-                    });
+                    }).catch(reject);
                 }
             })
         },
@@ -71,6 +71,7 @@ export const fundStore = defineStore("fund", {
                     .then((count) => {
                         resolve(count as number)
                     })
+                    .catch(reject)
             })
         }
     }

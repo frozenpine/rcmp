@@ -18,8 +18,8 @@ PRAGMA foreign_keys = false;
 -- ----------------------------
 -- Table structure for group_info
 -- ----------------------------
-DROP TABLE IF EXISTS "group_info";
-CREATE TABLE "group_info" (
+DROP TABLE IF EXISTS meta."group_info";
+CREATE TABLE meta."group_info" (
   "group_id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
   "group_name" TEXT NOT NULL,
   "group_desc" TEXT DEFAULT '',
@@ -30,8 +30,8 @@ CREATE TABLE "group_info" (
 -- ----------------------------
 -- Table structure for holidays
 -- ----------------------------
-DROP TABLE IF EXISTS "holidays";
-CREATE TABLE "holidays" (
+DROP TABLE IF EXISTS meta."holidays";
+CREATE TABLE meta."holidays" (
   "id" integer PRIMARY KEY AUTOINCREMENT,
   "created_at" datetime,
   "updated_at" datetime,
@@ -45,8 +45,8 @@ CREATE TABLE "holidays" (
 -- ----------------------------
 -- Table structure for investor_group
 -- ----------------------------
-DROP TABLE IF EXISTS "investor_group";
-CREATE TABLE "investor_group" (
+DROP TABLE IF EXISTS meta."investor_group";
+CREATE TABLE meta."investor_group" (
   "group_id" INTEGER NOT NULL,
   "broker_id" text NOT NULL,
   "investor_id" text NOT NULL,
@@ -60,8 +60,8 @@ CREATE TABLE "investor_group" (
 -- ----------------------------
 -- Table structure for investor_info
 -- ----------------------------
-DROP TABLE IF EXISTS "investor_info";
-CREATE TABLE "investor_info" (
+DROP TABLE IF EXISTS meta."investor_info";
+CREATE TABLE meta."investor_info" (
   "broker_id" text NOT NULL,
   "investor_id" text NOT NULL,
   "investor_name" TEXT DEFAULT '',
@@ -74,8 +74,8 @@ CREATE TABLE "investor_info" (
 -- ----------------------------
 -- Table structure for product_infos
 -- ----------------------------
-DROP TABLE IF EXISTS "product_infos";
-CREATE TABLE "product_infos" (
+DROP TABLE IF EXISTS meta."product_infos";
+CREATE TABLE meta."product_infos" (
   "id" integer PRIMARY KEY AUTOINCREMENT,
   "created_at" datetime,
   "updated_at" datetime,
@@ -97,29 +97,20 @@ CREATE TABLE "product_infos" (
 -- ----------------------------
 -- Table structure for product_segments
 -- ----------------------------
-DROP TABLE IF EXISTS "product_segments";
-CREATE TABLE "product_segments" (
+DROP TABLE IF EXISTS meta."product_segments";
+CREATE TABLE meta."product_segments" (
   "product_identity" text,
   "segment_name" text,
   PRIMARY KEY ("product_identity", "segment_name"),
-  CONSTRAINT "fk_product_segments_product_info" FOREIGN KEY ("product_identity") REFERENCES "product_infos" ("product_identity") ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT "fk_product_segments_trading_segment" FOREIGN KEY ("segment_name") REFERENCES "trading_segments" ("segment_name") ON DELETE SET NULL ON UPDATE CASCADE
-);
-
--- ----------------------------
--- Table structure for sqlite_sequence
--- ----------------------------
-DROP TABLE IF EXISTS "sqlite_sequence";
-CREATE TABLE "sqlite_sequence" (
-  "name",
-  "seq"
+  CONSTRAINT "fk_product_segments_product_info" FOREIGN KEY ("product_identity") REFERENCES "product_infos" ("product_identity") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "fk_product_segments_trading_segment" FOREIGN KEY ("segment_name") REFERENCES "trading_segments" ("segment_name") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- ----------------------------
 -- Table structure for trading_segments
 -- ----------------------------
-DROP TABLE IF EXISTS "trading_segments";
-CREATE TABLE "trading_segments" (
+DROP TABLE IF EXISTS meta."trading_segments";
+CREATE TABLE meta."trading_segments" (
   "id" integer PRIMARY KEY AUTOINCREMENT,
   "created_at" datetime,
   "updated_at" datetime,
@@ -131,73 +122,53 @@ CREATE TABLE "trading_segments" (
 );
 
 -- ----------------------------
--- Auto increment value for group_info
--- ----------------------------
-UPDATE "sqlite_sequence" SET seq = 2 WHERE name = 'group_info';
-
--- ----------------------------
--- Auto increment value for holidays
--- ----------------------------
-UPDATE "sqlite_sequence" SET seq = 66 WHERE name = 'holidays';
-
--- ----------------------------
 -- Indexes structure for table holidays
 -- ----------------------------
 CREATE UNIQUE INDEX "idx_holiday_range"
-ON "holidays" (
+ON meta."holidays" (
   "year" ASC,
   "start" ASC,
   "end" ASC
 );
 CREATE INDEX "idx_holidays_deleted_at"
-ON "holidays" (
+ON meta."holidays" (
   "deleted_at" ASC
 );
-
--- ----------------------------
--- Auto increment value for product_infos
--- ----------------------------
-UPDATE "sqlite_sequence" SET seq = 159 WHERE name = 'product_infos';
 
 -- ----------------------------
 -- Indexes structure for table product_infos
 -- ----------------------------
 CREATE UNIQUE INDEX "idx_product"
-ON "product_infos" (
+ON meta."product_infos" (
   "exchange_id" ASC,
   "product_id" ASC
 );
 CREATE INDEX "idx_product_infos_deleted_at"
-ON "product_infos" (
+ON meta."product_infos" (
   "deleted_at" ASC
 );
 CREATE INDEX "idx_product_infos_product_identity"
-ON "product_infos" (
+ON meta."product_infos" (
   "product_identity" ASC
 );
-
--- ----------------------------
--- Auto increment value for trading_segments
--- ----------------------------
-UPDATE "sqlite_sequence" SET seq = 16 WHERE name = 'trading_segments';
 
 -- ----------------------------
 -- Indexes structure for table trading_segments
 -- ----------------------------
 CREATE INDEX "idx_trading_segments_deleted_at"
-ON "trading_segments" (
+ON meta."trading_segments" (
   "deleted_at" ASC
 );
 CREATE INDEX "idx_trading_segments_from"
-ON "trading_segments" (
+ON meta."trading_segments" (
   "from" ASC
 );
 CREATE UNIQUE INDEX "idx_trading_segments_segment_name"
-ON "trading_segments" (
+ON meta."trading_segments" (
   "segment_name" ASC
 );
 CREATE INDEX "idx_trading_segments_to"
-ON "trading_segments" (
+ON meta."trading_segments" (
   "to" ASC
 );
 
