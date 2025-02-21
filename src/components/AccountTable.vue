@@ -14,15 +14,17 @@ interface AccountTableProps {
   loading?: boolean;
   data: DBAccount[];
   pageSizes?: number[];
+  watermark?: string;
 }
 
 const {
   loading = false,
   data,
   pageSizes = [5, 10, 15, 50],
+  watermark = "瑞达期货",
 } = defineProps<AccountTableProps>();
 
-const fmt = CurrencyFormatter();
+const CNY = CurrencyFormatter();
 const message = useMessage();
 
 const defaultColumns: DataTableColumns<DBAccount> = [
@@ -31,7 +33,7 @@ const defaultColumns: DataTableColumns<DBAccount> = [
   {title: "账号名称", key: "account_name", fixed: "left", width: 100, titleAlign: "center"},
   {
     title: "昨权益", key: "pre_balance", titleAlign: "center", align: "right",
-    render(row) {return h("label", fmt(row.pre_balance))},
+    render(row) {return h("label", CNY(row.pre_balance))},
     ellipsis: {
       tooltip: true
     },
@@ -39,7 +41,7 @@ const defaultColumns: DataTableColumns<DBAccount> = [
   },
   {
     title: "今权益", key: "balance", titleAlign: "center", align: "right",
-    render(row) {return h("label", fmt(row.balance))},
+    render(row) {return h("label", CNY(row.balance))},
     ellipsis: {
       tooltip: true
     },
@@ -47,7 +49,7 @@ const defaultColumns: DataTableColumns<DBAccount> = [
   },
   {
     title: "持仓盈亏", key: "position_profit", titleAlign: "center", align: "right",
-    render(row) {return h("label", fmt(row.position_profit))},
+    render(row) {return h("label", CNY(row.position_profit))},
     ellipsis: {
       tooltip: true
     },
@@ -55,7 +57,7 @@ const defaultColumns: DataTableColumns<DBAccount> = [
   },
   {
     title: "平仓盈亏", key: "close_profit", titleAlign: "center", align: "right",
-    render(row) {return h("label", fmt(row.close_profit))},
+    render(row) {return h("label", CNY(row.close_profit))},
     ellipsis: {
       tooltip: true
     },
@@ -63,7 +65,7 @@ const defaultColumns: DataTableColumns<DBAccount> = [
   },
   {
     title: "手续费", key: "fee", titleAlign: "center", align: "right",
-    render(row) {return h("label", fmt(row.fee))},
+    render(row) {return h("label", CNY(row.fee))},
     ellipsis: {
       tooltip: true
     },
@@ -71,7 +73,7 @@ const defaultColumns: DataTableColumns<DBAccount> = [
   },
   {
     title: "净盈亏", key: "net_profit", titleAlign: "center", align: "right",
-    render(row) {return h("label", fmt(row.net_profit))},
+    render(row) {return h("label", CNY(row.net_profit))},
     ellipsis: {
       tooltip: true
     },
@@ -166,7 +168,7 @@ const rowProps = (_: DBAccount) => {
 </script>
 
 <template>
-  <n-watermark content="瑞达期货"
+  <n-watermark :content="watermark"
                :font-size="16"
                :line-height="16"
                :width="192"

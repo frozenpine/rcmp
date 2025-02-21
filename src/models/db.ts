@@ -1,23 +1,43 @@
 import { Exchange, ProductClass } from "./type.ts"
 
 export interface DBAccount {
-    trading_day: string;
-    account_id: string;
-    account_name?: string;
-    balance: number;
-    frozen_balance: number;
-    pre_balance: number;
-    available: number;
-    deposit: number;
-    withdrawal: number;
-    margin: number;
-    frozen_margin: number;
-    fee: number;
-    frozen_fee: number;
-    position_profit: number;
-    close_profit: number;
-    net_profit: number;
-    currency_id: string;
+    readonly trading_day: string;
+    readonly broker_id: string;
+    readonly account_id: string;
+    readonly account_name?: string;
+    readonly balance: number;
+    readonly frozen_balance: number;
+    readonly pre_balance: number;
+    readonly available: number;
+    readonly deposit: number;
+    readonly withdrawal: number;
+    readonly margin: number;
+    readonly frozen_margin: number;
+    readonly fee: number;
+    readonly frozen_fee: number;
+    readonly position_profit: number;
+    readonly close_profit: number;
+    readonly net_profit: number;
+    readonly currency_id: string;
+}
+
+export interface DBGroup {
+    readonly group_id: number;
+    readonly group_name: string;
+    readonly group_desc: string;
+    readonly created_at?: Date
+    readonly deleted_at?: Date
+    readonly investors?: DBInvestor[]
+}
+
+export interface DBInvestor {
+    readonly broker_id: string;
+    readonly investor_id: string;
+    readonly investor_name: string;
+    readonly investor_desc: string;
+    readonly created_at?: Date,
+    readonly deleted_at?: Date,
+    readonly groups?: DBGroup[],
 }
 
 export interface Segment {

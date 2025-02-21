@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use sqlx::sqlite::SqlitePoolOptions;
-use sqlx::Executor;
+use sqlx::{Executor, Row};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -78,6 +78,27 @@ impl From<&dyn AccountInfo> for DBAccount {
             currency_id: info.get_currency_id(),
         }
     }
+}
+
+#[derive(Debug, Clone, Default, sqlx::FromRow, serde::Serialize, serde::Deserialize)]
+pub struct DBInvestorGroup {
+    pub group_id: i64,
+    pub group_name: String,
+    pub group_desc: String,
+    pub created_at: Option<chrono::NaiveDateTime>,
+    pub deleted_at: Option<chrono::NaiveDateTime>,
+    pub investors: Vec<DBInvestor>,
+}
+
+#[derive(Debug, Clone, Default, sqlx::FromRow, serde::Serialize, serde::Deserialize)]
+pub struct DBInvestor {
+    pub broker_id: String,
+    pub investor_id: String,
+    pub investor_name: String,
+    pub investor_desc: String,
+    pub created_at: Option<chrono::NaiveDateTime>,
+    pub deleted_at: Option<chrono::NaiveDateTime>,
+    pub groups: Vec<DBInvestorGroup>,
 }
 
 #[derive(Debug, Clone)]
@@ -267,7 +288,7 @@ impl DB {
         &self,
         accounts: &[&str],
     ) -> Result<Vec<DBAccount>, Box<dyn std::error::Error>> {
-        log::info!("querying all accounts data: {:?}", accounts);
+        log::info!("query accounts data with args: {:?}", accounts);
 
         let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             r#"SELECT
@@ -300,7 +321,7 @@ impl DB {
         end_date: Option<&str>,
     ) -> Result<Vec<DBAccount>, Box<dyn std::error::Error>> {
         log::info!(
-            "query accounts data between range: {:?}, [{:?}, {:?}]",
+            "query accounts range data with args: {:?}, [{:?}, {:?}]",
             accounts,
             start_date,
             end_date
@@ -338,6 +359,75 @@ impl DB {
         self.execute_account_qry(qry_builder).await
     }
 
+    pub async fn query_investors(&self, include_all: bool) -> Result<Vec<DBInvestor>, Box<dyn std::error::Error>> {
+        log::info!("query investors data with args: {}", include_all);
+
+        let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            r#"WITH investors AS (
+    SELECT
+        u.broker_id, u.investor_id, u.investor_name, u.investor_desc,
+        g.group_id, g.group_name, g.group_desc
+    FROM meta.investor_info as u
+    INNER JOIN meta.investor_group as r
+    ON u.investor_id = r.investor_id AND u.broker_id = r.broker_id AND u.deleted_at IS NULL
+    INNER JOIN meta.group_info as g
+    ON g.group_id = r.group_id AND g.deleted_at IS NULL
+    WHERE r.deleted_at IS NULL
+)
+SELECT * FROM investors
+UNION ALL
+SELECT
+    DISTINCT broker_id, account_id AS investor_id, '' AS investor_name, '' AS investor_desc,
+    -1 AS group_id, '' AS group_name, '' AS group_desc
+FROM fund.account
+WHERE $1 AND account_id NOT IN (SELECT investor_id FROM investors)
+ORDER BY broker_id, investor_id;"#
+        );
+        
+        let rows = qry_builder.build()
+            .bind(include_all)
+            .fetch_all(&self.pool).await?;
+        
+        if rows.is_empty() { return Ok(Vec::new()); }
+        
+        let mut investors: Vec<DBInvestor> = Vec::with_capacity(rows.len());
+        for row in rows {
+            let broker_id = row.get("broker_id");
+            let investor_id = row.get("investor_id");
+            
+            if investors.is_empty() || 
+                investors[investors.len() - 1].broker_id != broker_id || 
+                investors[investors.len() - 1].investor_id != investor_id {
+                
+                investors.push(DBInvestor{
+                    broker_id,
+                    investor_id,
+                    investor_name: row.get("investor_name"),
+                    investor_desc: row.get("investor_desc"),
+                    created_at: None,
+                    deleted_at: None,
+                    groups: vec![],
+                });
+            }
+
+            let group_id = row.get("group_id");
+            if group_id > 0 {
+                let idx = investors.len() - 1;
+                let investor = &mut investors[idx];
+                investor.groups.push(DBInvestorGroup{
+                    group_id,
+                    group_name: row.get("group_name"),
+                    group_desc: row.get("group_desc"),
+                    created_at: None,
+                    deleted_at: None,
+                    investors: vec![],
+                });
+            }
+        }
+
+        Ok(investors)
+    }
+
     pub fn is_closed(&self) -> bool {
         self.pool.is_closed()
     }
@@ -372,7 +462,7 @@ mod test {
     }
 
     #[test]
-    fn test_query() {
+    fn test_query_account() {
         env_logger::Builder::new()
             .filter_level(log::LevelFilter::Debug)
             .target(env_logger::Target::Stdout)
@@ -398,6 +488,27 @@ mod test {
                 Some("20250205"),
             ))
             .unwrap();
+
+        for v in result {
+            log::info!("{:?}", v);
+        }
+    }
+
+    #[test]
+    fn test_query_investor() {
+        env_logger::Builder::new()
+            .filter_level(log::LevelFilter::Debug)
+            .target(env_logger::Target::Stdout)
+            .init();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let db = rt.block_on(DB::new("..\\..\\data", &["fund", "meta"])).unwrap();
+
+        let result = rt.block_on(db.query_investors(true)).unwrap();
 
         for v in result {
             log::info!("{:?}", v);

@@ -19,7 +19,23 @@ async fn sink_tu_accounts(
         1000,
     )
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| {
+            log::error!("sink tu accounts failed: {:?}", e);
+            "sink tu accounts failed".to_string()
+        })
+}
+
+#[tauri::command]
+async fn query_investors(include_all: bool, state: State<'_, Mutex<Config>>) -> Result<Vec<db::DBInvestor>, String> {
+    let cfg = state.lock().await;
+
+    match cfg._db.as_ref() {
+        Some(db) => db.query_investors(include_all).await.map_err(|e| {
+            log::error!("query investors failed: {:?}", e);
+            "query investors failed".to_string()
+        }),
+        None => Err("no database initialized.".into())
+    }
 }
 
 #[tauri::command]
@@ -67,14 +83,17 @@ async fn query_accounts(
     start_date: Option<&str>,
     end_date: Option<&str>,
     state: State<'_, Mutex<Config>>,
-) -> Result<Vec<tddata::db::DBAccount>, String> {
+) -> Result<Vec<db::DBAccount>, String> {
     let cfg = state.lock().await;
 
     match cfg._db.as_ref() {
         Some(db) => db
             .query_accounts_range(&accounts, start_date, end_date)
             .await
-            .map_err(|e| e.to_string()),
+            .map_err(|e| {
+                log::error!("query accounts failed: {:?}", e);
+                "query accounts failed".to_string()
+            }),
         None => Err("no database initialized.".into()),
     }
 }
@@ -149,6 +168,7 @@ pub fn run() {
             sink_tu_account_dir,
             sink_tu_account_files,
             query_accounts,
+            query_investors,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

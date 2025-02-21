@@ -11,20 +11,53 @@ export const fundStore = defineStore("fund", {
     },
     actions: {
         async doQueryAccount(
-            accountID: string,
+            data: string | string[],
             startDate: string | undefined = undefined,
             endDate: string | undefined = undefined,
+            force: boolean = false,
         ): Promise<Array<DBAccount>> {
             return new Promise((resolve, reject) => {
-                if (!accountID) { reject("accountID is required"); }
+                if (!data) { reject("query account is required"); }
 
-                invoke("query_accounts", {
-                    accounts: [accountID],
-                    startDate: startDate,
-                    endDate: endDate,
-                }).then((values) => {
-                    resolve(values as Array<DBAccount>);
-                });
+                const accounts = Array.isArray(data)? data : [data];
+                const accountSet = new Set<string>(accounts);
+
+                if (!force && !startDate && !endDate) {
+                    [...this.accounts.keys()].forEach((idt) => {
+                        accountSet.delete(idt);
+                    })
+                }
+
+                if (accountSet.size <= 0) {
+                    console.log("query account hit data cache:", data);
+                    const result: Array<DBAccount> = [];
+
+                    accounts.forEach((v) => {
+                        result.push(...this.accounts.get(v)!)
+                    })
+
+                    resolve(result)
+                } else {
+                    console.log("query account from database:", data);
+
+                    invoke("query_accounts", {
+                        accounts: [...accountSet],
+                        startDate: startDate,
+                        endDate: endDate,
+                    }).then((values) => {
+                        const accounts = values as Array<DBAccount>
+
+                        accounts.forEach((v) => {
+                            if (!this.accounts.has(v.account_id)) {
+                                this.accounts.set(v.account_id, []);
+                            }
+
+                            this.accounts.get(v.account_id)!.push(v);
+                        })
+
+                        resolve(accounts);
+                    });
+                }
             })
         },
         async doSinkTuAccount(

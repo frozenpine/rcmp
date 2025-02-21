@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useOsTheme, darkTheme, dateZhCN, zhCN } from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop,
-  NSpace, NInput, NButton, NCard, NIcon,
+  NSpace, NButton, NCard, NIcon, NInput,
   NForm, NFormItem,
 } from "naive-ui";
 import { Search, ArrowBigUpLine } from "@vicons/tabler"
@@ -11,11 +11,14 @@ import { Search, ArrowBigUpLine } from "@vicons/tabler"
 import Feedback from "./components/Feedback.vue"
 import AccountTable from "./components/AccountTable.vue"
 import TUAccountSinker from "./components/TUAccountSinker.vue"
+import { useMessage } from "./utils/feedback.ts"
 
 import { DBAccount } from "./models/db.ts"
 import { fundStore } from "./store/fund.ts";
+import { metaStore } from "./store/meta.ts";
 
 const fund = fundStore();
+const meta = metaStore();
 
 const osTheme = useOsTheme();
 const accountID = ref("");
@@ -25,7 +28,6 @@ const data = ref<DBAccount[]>([]);
 function query_account() {
   if (!accountID.value) return;
 
-  console.log("querying account data:", accountID.value);
   loading.value = true;
 
   fund.doQueryAccount(accountID.value)
@@ -35,6 +37,21 @@ function query_account() {
       .catch(console.error)
       .finally(() => loading.value = false);
 }
+
+onMounted(() => {
+  const message = useMessage();
+
+  meta.doQueryInvestors(true)
+      .then((investors) => {
+        message.info(`已获取全部投资者信息【${investors.length}】`)
+      }).catch((err) => {
+        console.error("query investors failed:", err)
+        message.error("投资者查询失败", {
+          closable: true,
+          duration: 0,
+        })
+      })
+})
 </script>
 
 <template>
