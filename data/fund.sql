@@ -10,7 +10,7 @@
  Target Server Version : 3045000 (3.45.0)
  File Encoding         : 65001
 
- Date: 20/02/2025 11:10:59
+ Date: 21/02/2025 18:08:58
 */
 
 PRAGMA foreign_keys = false;
@@ -21,6 +21,7 @@ PRAGMA foreign_keys = false;
 DROP TABLE IF EXISTS "account";
 CREATE TABLE "account" (
   "trading_day" TEXT NOT NULL,
+  "broker_id" text NOT NULL,
   "account_id" text NOT NULL,
   "account_name" TEXT DEFAULT '',
   "balance" real NOT NULL DEFAULT 0,
@@ -39,7 +40,7 @@ CREATE TABLE "account" (
   "close_profit" real NOT NULL DEFAULT 0,
   "net_profit" real NOT NULL DEFAULT 0,
   "currency_id" text NOT NULL DEFAULT 'CNY',
-  PRIMARY KEY ("trading_day", "account_id", "currency_id")
+  PRIMARY KEY ("trading_day", "broker_id", "account_id", "currency_id")
 );
 
 PRAGMA foreign_keys = true;
