@@ -10,15 +10,7 @@ use tddata::{db, ctp::tu};
 async fn sink_tu_accounts(
     db: &db::DB, accounts: Vec<tu::Account>,
 ) -> Result<u64, String> {
-    db.sink_accounts(
-        // accounts
-        //     .iter()
-        //     .map(|s| s as &dyn db::AccountInfo)
-        //     .collect::<Vec<_>>()
-        //     .as_slice(),
-        // 1000,
-        &accounts, 1000,
-    )
+    db.sink_accounts(&accounts, 1000)
         .await
         .map_err(|e| {
             log::error!("sink tu accounts failed: {:?}", e);

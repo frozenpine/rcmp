@@ -2,6 +2,7 @@ use lazy_static::lazy_static;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Executor, Row};
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -455,15 +456,77 @@ pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std
     Ok(db)
 }
 
-// pub async fn create_db(
-//     base_dir: &str, sql_dir: &str, schemas: &[&str],
-// ) -> Result<DB, Box<dyn std::error::Error>> {
-//     for schema in HashSet::from_iter(schemas.iter()) {
-//         let sql_path = PathBuf::from(sql_dir).join(schema);
-//     }
-//
-//     todo!()
-// }
+pub async fn create_db(
+    base_dir: &str, sql_dir: &str, schemas: &[&str],
+) -> Result<DB, Box<dyn std::error::Error>> {
+    let mut schema_set = HashSet::with_capacity(schemas.len());
+
+    for v in schemas {
+        if !schema_set.insert(*v) {
+            log::warn!("Schema already exists: {}", *v);
+        }
+    }
+
+    for schema in schema_set {
+        let db_path = PathBuf::from(base_dir)
+            .join(schema)
+            .with_extension("db");
+
+        let sql_base = PathBuf::from(sql_dir)
+            .join(schema);
+
+        let conn = SqlitePoolOptions::new()
+            .min_connections(1)
+            .max_connections(1)
+            .connect(db_path.to_str().unwrap())
+            .await?;
+
+        let structure_sql_path = sql_base
+            .join(schema)
+            .with_extension("sql");
+        log::debug!("create schema structure by: {:?}", structure_sql_path);
+        let structure_sql = fs::read_to_string(
+            structure_sql_path,
+        )?;
+
+        let _ = sqlx::query(&structure_sql)
+            .execute(&conn)
+            .await?;
+
+        for entry in walkdir::WalkDir::new(sql_base)
+            .max_depth(1)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| {
+                if !e.file_type().is_file() {
+                    return false;
+                }
+
+                let file_name = e.file_name().to_str().unwrap_or("");
+
+                if !file_name.starts_with(schema) {
+                    return false;
+                }
+
+                file_name.ends_with("sql")
+            })
+        {
+            log::debug!("executing data insert by: {:?}", entry);
+
+            let data_sql = fs::read_to_string(entry.path())?;
+
+            match sqlx::query(&data_sql)
+                .execute(&conn)
+                .await
+            {
+                Ok(result) => log::info!("data sql finished: {:?}", result),
+                Err(e) => log::error!("data sql exec error: {:?}, {:?}", entry, e),
+            }
+        }
+    }
+
+    open_db(base_dir, schemas).await
+}
 
 #[cfg(test)]
 mod test {
@@ -494,6 +557,30 @@ mod test {
     }
 
     #[test]
+    fn test_create() {
+        env_logger::Builder::new()
+            .filter_level(log::LevelFilter::Debug)
+            .target(env_logger::Target::Stdout)
+            .init();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            match create_db(
+                "../data", "../sql",
+                &["fund", "meta"])
+                .await
+            {
+                Ok(db) => log::info!("db created: {:?}", db),
+                Err(e) => log::error!("failed to create db: {:?}", e),
+            }
+        })
+    }
+
+    #[test]
     fn test_query_account() {
         env_logger::Builder::new()
             .filter_level(log::LevelFilter::Debug)
@@ -505,21 +592,21 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(open_db("../data", &["fund"])).unwrap();
+        let db = rt.block_on(open_db("../data", &["fund"]))
+            .unwrap();
 
-        let result = rt.block_on(db.query_accounts(&["1000008"])).unwrap();
+        let result = rt.block_on(db.query_accounts(&["1000008"]))
+            .unwrap();
 
         for v in result {
             log::info!("{:?}", v);
         }
 
-        let result = rt
-            .block_on(db.query_accounts_range(
-                &["880303", "1000008"],
-                Some("20250201"),
-                Some("20250205"),
-            ))
-            .unwrap();
+        let result = rt.block_on(db.query_accounts_range(
+            &["880303", "1000008"],
+            Some("20250201"),
+            Some("20250205"),
+        )).unwrap();
 
         for v in result {
             log::info!("{:?}", v);
@@ -538,9 +625,11 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(open_db("../data", &["fund", "meta"])).unwrap();
+        let db = rt.block_on(open_db("../data", &["fund", "meta"]))
+            .unwrap();
 
-        let result = rt.block_on(db.query_investors(true)).unwrap();
+        let result = rt.block_on(db.query_investors(true))
+            .unwrap();
 
         for v in result {
             log::info!("{:?}", v);

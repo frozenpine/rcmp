@@ -117,13 +117,13 @@ CREATE TABLE IF NOT EXISTS "product_segments" (
 -- ----------------------------
 -- Indexes structure for table holidays
 -- ----------------------------
-CREATE UNIQUE INDEX "idx_holiday_range"
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_holiday_range"
 ON "holidays" (
   "year" ASC,
   "start" ASC,
   "end" ASC
 );
-CREATE INDEX "idx_holidays_deleted_at"
+CREATE INDEX IF NOT EXISTS "idx_holidays_deleted_at"
 ON "holidays" (
   "deleted_at" ASC
 );
@@ -131,36 +131,36 @@ ON "holidays" (
 -- ----------------------------
 -- Indexes structure for table product_infos
 -- ----------------------------
-CREATE UNIQUE INDEX "idx_product"
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_product"
 ON "product_infos" (
   "exchange_id" ASC,
   "product_id" ASC
 );
-CREATE INDEX "idx_product_infos_deleted_at"
+CREATE INDEX IF NOT EXISTS "idx_product_infos_deleted_at"
 ON "product_infos" (
   "deleted_at" ASC
 );
-CREATE INDEX "idx_product_infos_product_identity"
-ON meta."product_infos" (
+CREATE INDEX IF NOT EXISTS "idx_product_infos_product_identity"
+ON "product_infos" (
   "product_identity" ASC
 );
 
 -- ----------------------------
 -- Indexes structure for table trading_segments
 -- ----------------------------
-CREATE INDEX "idx_trading_segments_deleted_at"
+CREATE INDEX IF NOT EXISTS "idx_trading_segments_deleted_at"
 ON "trading_segments" (
   "deleted_at" ASC
 );
-CREATE INDEX "idx_trading_segments_from"
+CREATE INDEX IF NOT EXISTS "idx_trading_segments_from"
 ON "trading_segments" (
   "from" ASC
 );
-CREATE UNIQUE INDEX "idx_trading_segments_segment_name"
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_trading_segments_segment_name"
 ON "trading_segments" (
   "segment_name" ASC
 );
-CREATE INDEX "idx_trading_segments_to"
+CREATE INDEX IF NOT EXISTS "idx_trading_segments_to"
 ON "trading_segments" (
   "to" ASC
 );
