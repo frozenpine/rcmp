@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Executor, Row};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -129,64 +129,19 @@ lazy_static! {
 }
 
 impl DB {
-    pub async fn new(base_dir: &str, schemas: &[&str]) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut schema_cache = HashMap::with_capacity(schemas.len());
-
-        for v in schemas {
-            let s = Schema::new(base_dir, v);
-
-            if schema_cache.contains_key(&s.name) {
-                log::warn!("Schema already exists: {}", &s.name);
-            } else {
-                schema_cache.insert(s.name.clone(), s);
-            }
-        }
-
-        if let Ok(mut sql) = post_conn_sql.lock() {
-            if sql.deref() == "" {
-                *sql = schema_cache
-                    .iter()
-                    .map(|(k, v)| format!("ATTACH DATABASE '{}' AS {}", v.dsn, k))
-                    .collect::<Vec<String>>()
-                    .join("; ")
-            } else {
-                return Err("db with schemas already opened".into());
-            }
-        }
-
-        // Opening in memory db & attach to file db specified by schemas
-        let pool = SqlitePoolOptions::new()
-            .min_connections(1)
-            .max_connections(5)
-            .after_connect(|conn, meta| {
-                let mut sql = post_conn_sql.lock().unwrap().deref().to_string();
-                sql.push(';');
-
-                log::debug!(
-                    "registering schema for conn with sql: {:?}, {:?}, {}",
-                    conn,
-                    meta,
-                    sql
-                );
-
-                Box::pin(async move {
-                    conn.execute(sql.as_str()).await?;
-                    Ok(())
-                })
-            })
-            .connect("")
-            .await?;
-
-        let db = Self { pool };
-
-        Ok(db)
+    pub async fn open(base_dir: &str, schemas: &[&str]) -> Result<Self, Box<dyn std::error::Error>> {
+        open_db(base_dir, schemas).await
     }
 
-    pub async fn sink_accounts(
+    pub async fn sink_accounts<T: AccountInfo>(
         &self,
-        accounts: &[&dyn AccountInfo],
+        accounts: &[T],
         batch_size: usize,
     ) -> Result<u64, Box<dyn std::error::Error>> {
+        if self.is_closed() {
+            return Err("DB is closed".into());
+        }
+
         log::debug!("sinking for account data: {}", accounts.len());
 
         let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
@@ -288,6 +243,10 @@ impl DB {
         &self,
         accounts: &[&str],
     ) -> Result<Vec<DBAccount>, Box<dyn std::error::Error>> {
+        if self.is_closed() {
+            return Err("DB is closed".into());
+        }
+
         log::info!("query accounts data with args: {:?}", accounts);
 
         let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
@@ -320,6 +279,10 @@ impl DB {
         start_date: Option<&str>,
         end_date: Option<&str>,
     ) -> Result<Vec<DBAccount>, Box<dyn std::error::Error>> {
+        if self.is_closed() {
+            return Err("DB is closed".into());
+        }
+
         log::info!(
             "query accounts range data with args: {:?}, [{:?}, {:?}]",
             accounts,
@@ -359,7 +322,13 @@ impl DB {
         self.execute_account_qry(qry_builder).await
     }
 
-    pub async fn query_investors(&self, include_all: bool) -> Result<Vec<DBInvestor>, Box<dyn std::error::Error>> {
+    pub async fn query_investors(
+        &self, include_all: bool,
+    ) -> Result<Vec<DBInvestor>, Box<dyn std::error::Error>> {
+        if self.is_closed() {
+            return Err("DB is closed".into());
+        }
+
         log::info!("query investors data with args: {}", include_all);
 
         let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
@@ -433,6 +402,69 @@ ORDER BY broker_id, investor_id;"#
     }
 }
 
+pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std::error::Error>> {
+    let mut schema_cache = HashMap::with_capacity(schemas.len());
+
+    for v in schemas {
+        let s = Schema::new(base_dir, v);
+
+        if schema_cache.contains_key(&s.name) {
+            log::warn!("Schema already exists: {}", &s.name);
+        } else {
+            schema_cache.insert(s.name.clone(), s);
+        }
+    }
+
+    if let Ok(mut sql) = post_conn_sql.lock() {
+        if sql.deref() == "" {
+            *sql = schema_cache
+                .iter()
+                .map(|(k, v)| format!("ATTACH DATABASE '{}' AS {}", v.dsn, k))
+                .collect::<Vec<String>>()
+                .join("; ")
+        } else {
+            return Err("db with schemas already opened".into());
+        }
+    }
+
+    // Opening in memory db & attach to file db specified by schemas
+    let pool = SqlitePoolOptions::new()
+        .min_connections(1)
+        .max_connections(5)
+        .after_connect(|conn, meta| {
+            let mut sql = post_conn_sql.lock().unwrap().deref().to_string();
+            sql.push(';');
+
+            log::debug!(
+                    "registering schema for conn with sql: {:?}, {:?}, {}",
+                    conn,
+                    meta,
+                    sql
+                );
+
+            Box::pin(async move {
+                conn.execute(sql.as_str()).await?;
+                Ok(())
+            })
+        })
+        .connect("")
+        .await?;
+
+    let db = DB { pool };
+
+    Ok(db)
+}
+
+// pub async fn create_db(
+//     base_dir: &str, sql_dir: &str, schemas: &[&str],
+// ) -> Result<DB, Box<dyn std::error::Error>> {
+//     for schema in HashSet::from_iter(schemas.iter()) {
+//         let sql_path = PathBuf::from(sql_dir).join(schema);
+//     }
+//
+//     todo!()
+// }
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -450,7 +482,7 @@ mod test {
             .unwrap();
 
         rt.block_on(async {
-            match DB::new("..\\..\\data", &["fund"]).await {
+            match open_db("../data", &["fund"]).await {
                 Ok(db) => {
                     log::info!("db opened: {:?}", db);
                 }
@@ -473,7 +505,7 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(DB::new("..\\..\\data", &["fund"])).unwrap();
+        let db = rt.block_on(open_db("../data", &["fund"])).unwrap();
 
         let result = rt.block_on(db.query_accounts(&["1000008"])).unwrap();
 
@@ -506,7 +538,7 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(DB::new("..\\..\\data", &["fund", "meta"])).unwrap();
+        let db = rt.block_on(open_db("../data", &["fund", "meta"])).unwrap();
 
         let result = rt.block_on(db.query_investors(true)).unwrap();
 

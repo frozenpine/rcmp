@@ -11,12 +11,13 @@ async fn sink_tu_accounts(
     db: &db::DB, accounts: Vec<tu::Account>,
 ) -> Result<u64, String> {
     db.sink_accounts(
-        accounts
-            .iter()
-            .map(|s| s as &dyn db::AccountInfo)
-            .collect::<Vec<_>>()
-            .as_slice(),
-        1000,
+        // accounts
+        //     .iter()
+        //     .map(|s| s as &dyn db::AccountInfo)
+        //     .collect::<Vec<_>>()
+        //     .as_slice(),
+        // 1000,
+        &accounts, 1000,
     )
         .await
         .map_err(|e| {
@@ -124,7 +125,7 @@ pub fn run() {
 
             let mut cfg: Config = toml::from_str(&cfg_file)?;
 
-            let db = tauri::async_runtime::block_on(db::DB::new(
+            let db = tauri::async_runtime::block_on(db::open_db(
                 &cfg.data_base,
                 &cfg.schemas
                     .iter()

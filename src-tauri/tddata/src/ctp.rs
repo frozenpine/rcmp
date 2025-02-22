@@ -394,7 +394,7 @@ mod test {
             .init();
 
         let find_accounts =
-            tu::read_account_csv("../../data/查询资金2025-02-06.csv", &["880303"]).unwrap();
+            tu::read_account_csv("../data/查询资金2025-02-06.csv", &["880303"]).unwrap();
 
         assert_eq!(find_accounts.len(), 1);
         assert_eq!(find_accounts[0].user_id, "880303");
@@ -408,7 +408,7 @@ mod test {
             .target(env_logger::Target::Stdout)
             .init();
 
-        let accounts = tu::read_account_dir("../../data/", &["880303"], 1).unwrap();
+        let accounts = tu::read_account_dir("../data/", &["880303"], 1).unwrap();
 
         accounts.iter().for_each(|account| {
             log::info!("{:?}", account);
