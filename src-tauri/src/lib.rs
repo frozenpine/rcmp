@@ -96,9 +96,10 @@ async fn query_accounts(
 struct Config {
     #[serde(skip_serializing, skip_deserializing)]
     #[derivative(Debug = "ignore")]
-    _db: Option<tddata::db::DB>,
+    _db: Option<db::DB>,
 
     data_base: String,
+    sql_base: String,
     schemas: Vec<String>,
 }
 
@@ -117,8 +118,9 @@ pub fn run() {
 
             let mut cfg: Config = toml::from_str(&cfg_file)?;
 
-            let db = tauri::async_runtime::block_on(db::open_db(
+            let db = tauri::async_runtime::block_on(db::create_db(
                 &cfg.data_base,
+                &cfg.sql_base,
                 &cfg.schemas
                     .iter()
                     .map(|v| v.as_str())

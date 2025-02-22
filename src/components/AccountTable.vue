@@ -82,26 +82,28 @@ const defaultColumns: DataTableColumns<DBAccount> = [
   {title: "币种", key: "currency_id", fixed: "right", width: 60, titleAlign: "center", align: "right"},
 ]
 
-const currPageSizes = computed(()=>{
+const calcPageSizes = computed(()=>{
   if (data.length < 1) {
     return pageSizes;
   }
 
-  let idx = 0;
-
-  for (; idx < pageSizes.length; idx++) {
+  for (let idx = 0; idx < pageSizes.length; idx++) {
     if (pageSizes[idx] > data.length) {
-      break;
+      if (idx > 0) {
+        return pageSizes.slice(0, idx).concat([data.length]);
+      } else {
+        return [data.length];
+      }
     }
   }
 
-  return pageSizes.slice(0, idx).concat([data.length]);
+  return pageSizes.concat([data.length]);
 })
 const pagination = reactive({
   page: 1,
-  pageSize: 5,
+  pageSize: calcPageSizes.value[0] || 5,
   showSizePicker: true,
-  pageSizes: currPageSizes,
+  pageSizes: calcPageSizes,
   onChange: (page: number) => {pagination.page = page},
   onUpdatePageSize: (pageSize: number) => {
     pagination.pageSize = pageSize;
@@ -178,7 +180,7 @@ const rowProps = (_: DBAccount) => {
                :rotate="-15"
                cross selectable>
     <n-data-table ref="dt" :columns="defaultColumns" :data="data" :loading="loading"
-                  :row-key="getRowKey" :pagination="pagination" :row-props="rowProps"
+                  :row-key="getRowKey" :pagination="data && data.length > 0? pagination : false" :row-props="rowProps"
                   striped ></n-data-table>
   </n-watermark>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
