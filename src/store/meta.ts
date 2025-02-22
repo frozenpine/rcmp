@@ -11,6 +11,7 @@ export const metaStore = defineStore("meta", {
             products: new Map([]) as Map<string, ProductInfo>,
             investors: new Map([]) as Map<string, DBInvestor>,
             groups: new Map([]) as Map<number, DBGroup>,
+            ungrouped: [] as Array<DBInvestor>
         }
     },
     getters: {
@@ -28,8 +29,12 @@ export const metaStore = defineStore("meta", {
                 return state.holidays.get(date.format("YYYY-MM-DD"))
             }
         },
-        group_investors(state) {
-            return [...state.groups.values()]
+        group_investors: (state) => {
+            return [...state.groups.values()].concat([{
+                group_id: -1,
+                group_name: "未分组",
+                investors: state.ungrouped,
+            }])
         }
     },
     actions: {
@@ -52,21 +57,27 @@ export const metaStore = defineStore("meta", {
                     }).then((values) => {
                         const investors = values as Array<DBInvestor>;
 
+                        this.investors.clear();
+                        this.groups.clear();
+                        this.ungrouped.length = 0;
+
                         investors.forEach((v) => {
                             this.investors.set(
                                 [v.broker_id, v.investor_id].join("."),
                                 v
                             );
 
-                            v.groups?.forEach((g) => {
-                                if (g.group_id < 0) return;
+                            if (v.groups && v.groups.length > 0) {
+                                v.groups?.forEach((g) => {
+                                    if (!this.groups.has(g.group_id)) {
+                                        this.groups.set(g.group_id, Object.assign({}, g));
+                                    }
 
-                                if (!this.groups.has(g.group_id)) {
-                                    this.groups.set(g.group_id, Object.assign({}, g));
-                                }
-
-                                this.groups.get(g.group_id)!.investors!.push(v);
-                            })
+                                    this.groups.get(g.group_id)!.investors!.push(v);
+                                })
+                            } else {
+                                this.ungrouped.push(v)
+                            }
                         })
 
                         resolve(investors)

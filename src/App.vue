@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import { useOsTheme, darkTheme, dateZhCN, zhCN } from 'naive-ui'
+import {ref, onMounted, computed} from "vue";
+import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop,
-  NSpace, NButton, NCard, NIcon, NInput,
+  NSpace, NButton, NCard, NIcon, NTreeSelect,
   NForm, NFormItem,
 } from "naive-ui";
 import { Search, ArrowBigUpLine } from "@vicons/tabler"
@@ -21,16 +21,33 @@ const fund = fundStore();
 const meta = metaStore();
 
 const osTheme = useOsTheme();
-const accountID = ref("");
+const selected = ref(undefined);
 const loading = ref(false);
 const data = ref<DBAccount[]>([]);
 
+const selectOptions = computed(() => {
+  const groupInvestors = meta.group_investors;
+
+  return groupInvestors.map((g) => {
+    return {
+      label: g.group_name,
+      key: g.group_id,
+      children: g.investors!.map((v) => {
+        return {
+          label: `${v.investor_name} (${v.investor_id})`,
+          key: v.investor_id,
+        }
+      }),
+    }
+  });
+})
+
 function query_account() {
-  if (!accountID.value) return;
+  if (!selected.value) return;
 
   loading.value = true;
 
-  fund.doQueryAccount(accountID.value)
+  fund.doQueryAccounts(selected.value)
       .then((accounts) => {
         data.value = accounts.reverse();
       })
@@ -65,10 +82,12 @@ onMounted(() => {
           </template>
           <n-form class="query" :disabled="loading" inline>
             <n-form-item>
-              <n-input v-model:value="accountID" placeholder="请输入资金账号" clearable />
+              <n-tree-select v-model:value="selected" :options="selectOptions"
+                             check-strategy="child" placeholder="请选择投资者"
+                             clearable filterable></n-tree-select>
             </n-form-item>
             <n-form-item>
-              <n-button attr-type="submit" @click="query_account" :disabled="!accountID" type="info" >
+              <n-button attr-type="submit" @click="query_account" :disabled="!selected" type="info" >
                 <template #icon>
                   <n-icon><Search/></n-icon>
                 </template>
