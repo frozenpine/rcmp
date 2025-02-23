@@ -12,7 +12,7 @@ import {useMessage} from "../utils/feedback.ts";
 
 interface AccountTableProps {
   loading?: boolean;
-  data: DBAccount[];
+  data?: DBAccount[];
   pageSizes?: number[];
   watermark?: string;
 }
@@ -83,7 +83,7 @@ const defaultColumns: DataTableColumns<DBAccount> = [
 ]
 
 const calcPageSizes = computed(()=>{
-  if (data.length < 1) {
+  if (!data || data.length < 1) {
     return pageSizes;
   }
 

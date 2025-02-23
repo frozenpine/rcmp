@@ -15,21 +15,35 @@ export const metaStore = defineStore("meta", {
         }
     },
     getters: {
-        is_holiday: (state) => {
+        isHoliday: (state) => {
             return (value: string | number | dayjs.Dayjs | Date): boolean => {
                 const date = dayjs(value)
 
                 return state.holidays.has(date.format("YYYY-MM-DD"))
             }
         },
-        get_holiday: (state) => {
+        getHoliday: (state) => {
             return (value: string | number | dayjs.Dayjs | Date): Vacation | undefined => {
                 const date = dayjs(value)
 
                 return state.holidays.get(date.format("YYYY-MM-DD"))
             }
         },
-        group_investors: (state) => {
+        getGroup: (state) => {
+            return (gid: number): DBGroup|undefined => {
+                return state.groups.get(gid);
+            }
+        },
+        getInvestor: (state) => {
+            return (inv_id: string, broker_id: string = "5100"): DBInvestor | undefined => {
+                const idt = [broker_id, inv_id].join(".")
+                return state.investors.get(idt);
+            }
+        },
+        allInvestors: (state): DBInvestor[] => {
+            return [...state.investors.values()];
+        },
+        groupInvestors: (state): DBGroup[] => {
             return [...state.groups.values()].concat([{
                 group_id: -1,
                 group_name: "未分组",
@@ -84,6 +98,13 @@ export const metaStore = defineStore("meta", {
                     }).catch(reject);
                 }
             });
-        }
+        },
+        async doModifyGroup(group_name: string, {
+            group_id = -1,
+            investors,
+        }: {
+            group_id?: number,
+            investors?: DBInvestor[],
+        }): Promise<DBGroup> {},
     }
 })

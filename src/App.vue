@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, onMounted} from "vue";
+import {ref, onMounted, computed} from "vue";
 import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop,
@@ -14,7 +14,6 @@ import TUAccountSinker from "./components/TUAccountSinker.vue"
 import InvestorSelector from "./components/InvestorSelector.vue"
 import { useMessage } from "./utils/feedback.ts"
 
-import { DBAccount } from "./models/db.ts"
 import { fundStore } from "./store/fund.ts";
 import { metaStore } from "./store/meta.ts";
 
@@ -25,19 +24,18 @@ const osTheme = useOsTheme();
 
 const accountLoading = ref(false);
 const investorLoading = ref(false);
-const data = ref<DBAccount[]>([]);
-const selected = ref(undefined);
+const selectedInvestor = ref<string>(undefined);
 
+const selectedInvestorAccounts = computed(() => {
+  return fund.getInvestorAccounts(selectedInvestor.value);
+})
 
-function query_account() {
-  if (!selected.value) return;
+function queryAccounts() {
+  if (!selectedInvestor.value) return;
 
   accountLoading.value = true;
 
-  fund.doQueryAccounts(selected.value)
-      .then((accounts) => {
-        data.value = accounts.reverse();
-      })
+  fund.doQueryAccounts(selectedInvestor.value)
       .catch(console.error)
       .finally(() => accountLoading.value = false);
 }
@@ -69,9 +67,9 @@ onMounted(() => {
             <TUAccountSinker />
           </template>
           <n-form class="query" :disabled="accountLoading" inline>
-            <n-form-item><InvestorSelector v-model:selected="selected" :loading="investorLoading"/></n-form-item>
+            <n-form-item><InvestorSelector v-model:selected="selectedInvestor" :loading="investorLoading"/></n-form-item>
             <n-form-item>
-              <n-button attr-type="submit" @click="query_account" :disabled="!selected" type="info" >
+              <n-button attr-type="submit" @click="queryAccounts" :disabled="!selectedInvestor" type="info" >
                 <template #icon>
                   <n-icon><Search/></n-icon>
                 </template>
@@ -81,7 +79,7 @@ onMounted(() => {
           </n-form>
         </n-card>
       </n-space>
-      <AccountTable :data="data" :loading="accountLoading" />
+      <AccountTable :data="selectedInvestorAccounts" :loading="accountLoading" />
     </n-space>
     <n-back-top :style="{zIndex: 999}"><n-icon size="20"><ArrowBigUpLine/></n-icon></n-back-top>
   </n-config-provider>

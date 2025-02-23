@@ -9,6 +9,13 @@ export const fundStore = defineStore("fund", {
             accounts: new Map([]) as Map<string, DBAccount[]>,
         }
     },
+    getters: {
+        getInvestorAccounts: (state) => {
+            return (investor_id: string): DBAccount[] | undefined => {
+                return state.accounts.get(investor_id);
+            }
+        },
+    },
     actions: {
         async doQueryAccounts(
             accounts: string, {
@@ -27,7 +34,7 @@ export const fundStore = defineStore("fund", {
                 if (!force && !startDate && !endDate && this.accounts.has(accounts)) {
                     console.log("query account hit data cache:", accounts);
 
-                    resolve(this.accounts.get(accounts)!)
+                    resolve(this.getInvestorAccounts(accounts))
                 } else {
                     console.log("query account from database:", accounts);
 
