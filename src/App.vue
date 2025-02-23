@@ -23,7 +23,8 @@ const meta = metaStore();
 
 const osTheme = useOsTheme();
 
-const loading = ref(false);
+const accountLoading = ref(false);
+const investorLoading = ref(false);
 const data = ref<DBAccount[]>([]);
 const selected = ref(undefined);
 
@@ -31,19 +32,20 @@ const selected = ref(undefined);
 function query_account() {
   if (!selected.value) return;
 
-  loading.value = true;
+  accountLoading.value = true;
 
   fund.doQueryAccounts(selected.value)
       .then((accounts) => {
         data.value = accounts.reverse();
       })
       .catch(console.error)
-      .finally(() => loading.value = false);
+      .finally(() => accountLoading.value = false);
 }
 
 onMounted(() => {
   const message = useMessage();
 
+  investorLoading.value = true;
   meta.doQueryInvestors(true)
       .then((investors) => {
         message.info(`已获取全部投资者信息【${investors.length}】`)
@@ -53,7 +55,7 @@ onMounted(() => {
           closable: true,
           duration: 0,
         })
-      })
+      }).finally(()=>investorLoading.value = false);
 })
 </script>
 
@@ -66,8 +68,8 @@ onMounted(() => {
           <template #header-extra>
             <TUAccountSinker />
           </template>
-          <n-form class="query" :disabled="loading" inline>
-            <n-form-item><InvestorSelector v-model:selected="selected"/></n-form-item>
+          <n-form class="query" :disabled="accountLoading" inline>
+            <n-form-item><InvestorSelector v-model:selected="selected" :loading="investorLoading"/></n-form-item>
             <n-form-item>
               <n-button attr-type="submit" @click="query_account" :disabled="!selected" type="info" >
                 <template #icon>
@@ -79,7 +81,7 @@ onMounted(() => {
           </n-form>
         </n-card>
       </n-space>
-      <AccountTable :data="data" :loading="loading" />
+      <AccountTable :data="data" :loading="accountLoading" />
     </n-space>
     <n-back-top :style="{zIndex: 999}"><n-icon size="20"><ArrowBigUpLine/></n-icon></n-back-top>
   </n-config-provider>
