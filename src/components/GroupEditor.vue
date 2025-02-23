@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {computed, ref} from "vue";
-import {NTransfer, NCard, NSelect} from "naive-ui";
+import {NTransfer, NCard, NSelect, NTag, NIcon} from "naive-ui";
+import {ContactCardGroup48Filled} from "@vicons/fluent";
 
 import {metaStore} from "../store/meta.ts"
 
@@ -15,7 +16,9 @@ const groupName = computed(()=>{
 
   const group = meta.getGroup(selectedGroup.value);
 
-  selectedInvestors.value = group?.investors;
+  selectedInvestors.value = group?.investors.map((v) => {
+    return v.investor_id;
+  });
 
   return group?.group_name;
 })
@@ -44,23 +47,17 @@ const transferOptions = computed(() => {
 <template>
   <n-card>
     <template #header>
-      {{groupName}}
+      <n-tag :bordered="false" size="large">
+        {{groupName}}
+        <template #icon>
+          <n-icon><ContactCardGroup48Filled/></n-icon>
+        </template>
+      </n-tag>
     </template>
     <template #header-extra>
-<!--      <n-space>-->
         <n-select v-model:value="selectedGroup" :options="groupOptions"
                   :on-create="console.log"
                   tag filterable clearable></n-select>
-<!--        <n-popover trigger="click" placement="bottom-end">-->
-<!--          <template #trigger>-->
-<!--            <n-icon size="30"><ContactCardGroup28Filled/></n-icon>-->
-<!--          </template>-->
-<!--          <n-input size="small" placeholder="请输入组名"></n-input>-->
-<!--          <template #footer>-->
-<!--            <n-button size="tiny">确定</n-button>-->
-<!--          </template>-->
-<!--        </n-popover>-->
-<!--      </n-space>-->
     </template>
     <n-transfer v-model:value="selectedInvestors" :options="transferOptions"
                 source-title="投资者账号" :target-title="groupName"
