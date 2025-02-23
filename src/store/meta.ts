@@ -34,7 +34,7 @@ export const metaStore = defineStore("meta", {
                 group_id: -1,
                 group_name: "未分组",
                 investors: state.ungrouped,
-            }])
+            } as DBGroup])
         }
     },
     actions: {

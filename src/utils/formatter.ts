@@ -28,16 +28,5 @@ export const CurrencyFormatter = (prefix: string = "￥", preces: number = 2) =>
         let result = value.replace(DIGIT_PATTERN, (m) => m.replace(MILLI_PATTERN, ","))
 
         return `${prefix} ${minus}${result}.${decimal}`;
-
-        // const split = Math.floor(value.length / 3)
-        // const remain = value.length - split*3
-        //
-        // const results: string[] = [value.slice(0, remain)]
-        // console.log(results)
-        // for (let i = 0; i < split; i++) {
-        //     results.push(value.slice(remain+i*3, remain+(i+1)*3))
-        // }
-        //
-        // return `${prefix} ${minus}${results.join(",")}.${decimal}`
     }
 }

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import {ref, onMounted, computed} from "vue";
+import {ref, onMounted} from "vue";
 import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop,
-  NSpace, NButton, NCard, NIcon, NTreeSelect,
+  NSpace, NButton, NCard, NIcon,
   NForm, NFormItem,
 } from "naive-ui";
 import { Search, ArrowBigUpLine } from "@vicons/tabler"
@@ -11,6 +11,7 @@ import { Search, ArrowBigUpLine } from "@vicons/tabler"
 import Feedback from "./components/Feedback.vue"
 import AccountTable from "./components/AccountTable.vue"
 import TUAccountSinker from "./components/TUAccountSinker.vue"
+import InvestorSelector from "./components/InvestorSelector.vue"
 import { useMessage } from "./utils/feedback.ts"
 
 import { DBAccount } from "./models/db.ts"
@@ -21,26 +22,11 @@ const fund = fundStore();
 const meta = metaStore();
 
 const osTheme = useOsTheme();
-const selected = ref(undefined);
+
 const loading = ref(false);
 const data = ref<DBAccount[]>([]);
+const selected = ref(undefined);
 
-const selectOptions = computed(() => {
-  const groupInvestors = meta.group_investors;
-
-  return groupInvestors.map((g) => {
-    return {
-      label: g.group_name,
-      key: g.group_id,
-      children: g.investors!.map((v) => {
-        return {
-          label: `${v.investor_name} (${v.investor_id})`,
-          key: v.investor_id,
-        }
-      }),
-    }
-  });
-})
 
 function query_account() {
   if (!selected.value) return;
@@ -81,11 +67,7 @@ onMounted(() => {
             <TUAccountSinker />
           </template>
           <n-form class="query" :disabled="loading" inline>
-            <n-form-item>
-              <n-tree-select v-model:value="selected" :options="selectOptions"
-                             check-strategy="child" placeholder="请选择投资者"
-                             clearable filterable></n-tree-select>
-            </n-form-item>
+            <n-form-item><InvestorSelector v-model:selected="selected"/></n-form-item>
             <n-form-item>
               <n-button attr-type="submit" @click="query_account" :disabled="!selected" type="info" >
                 <template #icon>

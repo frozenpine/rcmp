@@ -24,7 +24,7 @@ export interface DBAccount {
 export interface DBGroup {
     readonly group_id: number;
     readonly group_name: string;
-    readonly group_desc: string;
+    readonly group_desc?: string;
     readonly created_at?: Date
     readonly deleted_at?: Date
     readonly investors?: DBInvestor[]
@@ -34,7 +34,7 @@ export interface DBInvestor {
     readonly broker_id: string;
     readonly investor_id: string;
     readonly investor_name: string;
-    readonly investor_desc: string;
+    readonly investor_desc?: string;
     readonly created_at?: Date,
     readonly deleted_at?: Date,
     readonly groups?: DBGroup[],
