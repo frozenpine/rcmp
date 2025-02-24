@@ -40,7 +40,11 @@ function loadGroupInvestors() {
 
 defineExpose({
   loadGroupInvestors,
-})
+});
+
+export interface InvestorSelectorInst {
+  loadGroupInvestors(): void;
+}
 
 const selectOptions = computed(() => {
   return meta.groupInvestors.map((g) => {

@@ -42,7 +42,9 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "config/config.toml"
+      "config/config.toml",
+      "sql/fund/*.sql",
+      "sql/meta/*.sql"
     ]
   },
   "plugins": {

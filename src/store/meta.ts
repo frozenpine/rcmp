@@ -99,12 +99,12 @@ export const metaStore = defineStore("meta", {
                 }
             });
         },
-        async doModifyGroup(group_name: string, {
-            group_id = -1,
-            investors,
-        }: {
-            group_id?: number,
-            investors?: DBInvestor[],
-        }): Promise<DBGroup> {},
+        // async doModifyGroup(group_name: string, {
+        //     group_id = -1,
+        //     investors,
+        // }: {
+        //     group_id?: number,
+        //     investors?: DBInvestor[],
+        // }): Promise<DBGroup> {},
     }
 })

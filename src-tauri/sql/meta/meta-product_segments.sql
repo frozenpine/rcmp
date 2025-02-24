@@ -1,5 +1,4 @@
-INSERT OR IGNORE INTO "product_segments" ("product_identity", "segment_name") VALUES (
-                                                                            ('CFFEX.IC', '中金白盘0930');
+INSERT OR IGNORE INTO "product_segments" ("product_identity", "segment_name") VALUES ('CFFEX.IC', '中金白盘0930');
 INSERT OR IGNORE INTO "product_segments" ("product_identity", "segment_name") VALUES ('CFFEX.IC', '中金白盘1130');
 INSERT OR IGNORE INTO "product_segments" ("product_identity", "segment_name") VALUES ('CFFEX.IC', '中金白盘1500');
 INSERT OR IGNORE INTO "product_segments" ("product_identity", "segment_name") VALUES ('CFFEX.IF', '中金白盘0930');

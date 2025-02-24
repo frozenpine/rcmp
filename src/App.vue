@@ -4,7 +4,7 @@ import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop,
   NSpace, NButton, NCard, NIcon,
-  NForm, NFormItem, NPopover,
+  NForm, NFormItem,
 } from "naive-ui";
 import { Search, ArrowBigUpLine } from "@vicons/tabler"
 
@@ -12,6 +12,7 @@ import Feedback from "./components/Feedback.vue"
 import AccountTable from "./components/AccountTable.vue"
 import TUAccountSinker from "./components/TUAccountSinker.vue"
 import InvestorSelector from "./components/InvestorSelector.vue"
+// import type {InvestorSelectorInst} from "./components/InvestorSelectorInst.vue"
 
 import { fundStore } from "./store/fund.ts";
 
@@ -20,6 +21,7 @@ const fund = fundStore();
 const osTheme = useOsTheme();
 
 const accountLoading = ref(false);
+// const investorSelectorRef = ref<InvestorSelectorInst>(undefined);
 const investorSelectorRef = ref(undefined);
 const selectedInvestor = ref<string>("");
 
@@ -54,20 +56,15 @@ onMounted(() => {
           <n-form class="query" :disabled="accountLoading" inline>
             <n-form-item><InvestorSelector ref="investorSelectorRef" v-model:selected="selectedInvestor" /></n-form-item>
             <n-form-item>
-<!--              <n-popover trigger="hover" :delay="500" :duration="1000" placement="bottom-end">-->
-<!--                <template #trigger>-->
-                  <n-button attr-type="submit"
-                            @click.exact.stop="queryAccounts(false)"
-                            @click.ctrl.exact.stop="queryAccounts(true)"
-                            :disabled="!selectedInvestor" type="info" >
-                    <template #icon>
-                      <n-icon><Search/></n-icon>
-                    </template>
-                    查询
-                  </n-button>
-<!--                </template>-->
-<!--                按住Ctrl点击，强制从数据库刷新-->
-<!--              </n-popover>-->
+              <n-button attr-type="submit"
+                        @click.exact.stop="queryAccounts(false)"
+                        @click.ctrl.exact.stop="queryAccounts(true)"
+                        :disabled="!selectedInvestor" type="info" >
+                <template #icon>
+                  <n-icon><Search/></n-icon>
+                </template>
+                查询
+              </n-button>
             </n-form-item>
           </n-form>
         </n-card>

@@ -234,7 +234,7 @@ impl DB {
         &self,
         mut qry_builder: sqlx::QueryBuilder<'_, sqlx::Sqlite>,
     ) -> Result<Vec<DBAccount>, Box<dyn std::error::Error>> {
-        qry_builder.push(" ORDER BY account_id, trading_day ASC;");
+        qry_builder.push(" ORDER BY account_id ASC, trading_day DESC;");
 
         let query = qry_builder.build_query_as::<DBAccount>();
         Ok(query.fetch_all(&self.pool).await?)
@@ -484,6 +484,7 @@ pub async fn create_db(
         let structure_sql_path = sql_base
             .join(schema)
             .with_extension("sql");
+
         log::debug!("create schema structure by: {:?}", structure_sql_path);
         let structure_sql = fs::read_to_string(
             structure_sql_path,
@@ -504,13 +505,23 @@ pub async fn create_db(
 
                 let file_name = e.file_name().to_str().unwrap_or("");
 
-                if !file_name.starts_with(schema) {
+                if !file_name.starts_with(&format!("{}-", schema)) {
                     return false;
                 }
 
                 file_name.ends_with("sql")
             })
         {
+            let mut data_sql_done = PathBuf::from(entry.path());
+            data_sql_done.set_extension("ok");
+
+            if let Ok(exist) = fs::exists(data_sql_done.as_path()) {
+                if exist {
+                    log::info!("initial data already done: {:?}, {:?}", entry, data_sql_done);
+                    continue;
+                }
+            }
+
             log::debug!("executing data insert by: {:?}", entry);
 
             let data_sql = fs::read_to_string(entry.path())?;
@@ -519,8 +530,15 @@ pub async fn create_db(
                 .execute(&conn)
                 .await
             {
-                Ok(result) => log::info!("data sql finished: {:?}", result),
-                Err(e) => log::error!("data sql exec error: {:?}, {:?}", entry, e),
+                Ok(result) => {
+                    log::info!("data sql finished: {:?}", result);
+
+                    match fs::File::create(data_sql_done.as_path()) {
+                        Ok(_) => log::info!("data ok file created: {:?}", data_sql_done),
+                        Err(e) => log::error!("failed to create data ok file: {:?}", e),
+                    }
+                },
+                Err(e) => log::error!("data sql exec failed: {:?}, {:?}", entry, e),
             }
         }
     }
