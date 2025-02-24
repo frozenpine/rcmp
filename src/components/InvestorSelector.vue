@@ -49,7 +49,7 @@ const selectOptions = computed(() => {
       key: g.group_id,
       children: g.investors!.map((v) => {
         return {
-          label: `${v.investor_name} (${v.investor_id})`,
+          label: `${v.investor_name? v.investor_name : '未命名'} (${v.investor_id})`,
           key: v.investor_id,
         }
       }),
@@ -60,8 +60,8 @@ const selectOptions = computed(() => {
 
 <template>
   <n-modal-provider>
-    <n-modal v-model:show="showEditor" size="large">
-      <GroupEditor />
+    <n-modal v-model:show="showEditor" :mask-closable="false" size="large">
+      <GroupEditor @close="showEditor = false" />
     </n-modal>
   </n-modal-provider>
   <n-tree-select :loading="loading || investorLoading" v-model:value="selected" :options="selectOptions"

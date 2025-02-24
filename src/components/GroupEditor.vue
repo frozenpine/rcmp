@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, ref, h, defineComponent} from "vue";
+import {computed, ref, h} from "vue";
 import {NTransfer, NCard, NSpace, NButton, NSelect, NInput} from "naive-ui";
 import type {TransferOption, TransferRenderTargetLabel } from "naive-ui"
 
@@ -28,7 +28,7 @@ class InvestorProxy implements TransferOption {
       this._inner.investor_name? this._inner.investor_name : (
           this.investor_name? this.investor_name + '*' : "未命名"
       )
-    }(${this._inner.investor_id})`
+    } (${this._inner.investor_id})`
   }
 
   get value(): string {
@@ -39,6 +39,8 @@ class InvestorProxy implements TransferOption {
 const meta = metaStore();
 const selectedGroup = ref<string | number | undefined>(undefined);
 const selectedInvestors = ref<string[] | undefined>(undefined);
+
+const emit = defineEmits(["close"]);
 
 const groupName = computed(()=>{
   if (!selectedGroup.value) {
@@ -115,10 +117,10 @@ function investorsCommit() {
 </script>
 
 <template>
-  <n-card title="投资者组编辑">
+  <n-card title="投资者组编辑" closable @close="emit('close')">
     <template #header-extra>
         <n-select v-model:value="selectedGroup" :options="groupOptions"
-                  tag filterable clearable></n-select>
+                  size="small" tag filterable clearable></n-select>
     </template>
     <n-transfer v-model:value="selectedInvestors" :options="transferOptions"
                 source-title="投资者账号" :target-title="groupName"
