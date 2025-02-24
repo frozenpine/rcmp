@@ -35,8 +35,8 @@ export const metaStore = defineStore("meta", {
             }
         },
         getInvestor: (state) => {
-            return (inv_id: string, broker_id: string = "5100"): DBInvestor | undefined => {
-                const idt = [broker_id, inv_id].join(".")
+            return (investor_id: string, broker_id: string = "5100"): DBInvestor | undefined => {
+                const idt = [broker_id, investor_id].join(".")
                 return state.investors.get(idt);
             }
         },

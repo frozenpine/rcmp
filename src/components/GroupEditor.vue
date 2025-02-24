@@ -6,21 +6,26 @@ import type {TransferOption, TransferRenderTargetLabel } from "naive-ui"
 import {metaStore} from "../store/meta.ts"
 import {DBInvestor} from "../models/db.ts";
 
-class InvestorProxy implements TransferOption {
+class InvestorProxy implements TransferOption, DBInvestor {
   private _inner: DBInvestor
   investor_name?: string
   investor_desc?: string
+  created_at?: Date
 
   constructor(inner: DBInvestor) {
     this._inner = inner;
   }
 
-  get hasName(): boolean {
-    return this._inner.investor_name != "" && this._inner.investor_name != undefined;
+  get broker_id(): string {
+    return this._inner.broker_id;
   }
 
   get investor_id(): string {
     return this._inner.investor_id;
+  }
+
+  get hasName(): boolean {
+    return this._inner.investor_name != "" && this._inner.investor_name != undefined;
   }
 
   get label(): string {

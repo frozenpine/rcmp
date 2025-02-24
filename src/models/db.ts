@@ -33,7 +33,7 @@ export interface DBGroup {
 export interface DBInvestor {
     readonly broker_id: string;
     readonly investor_id: string;
-    readonly investor_name: string;
+    readonly investor_name?: string;
     readonly investor_desc?: string;
     readonly created_at?: Date,
     readonly deleted_at?: Date,

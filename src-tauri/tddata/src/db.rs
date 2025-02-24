@@ -2,6 +2,7 @@ use lazy_static::lazy_static;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Executor, Row};
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 use std::fs;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -83,16 +84,18 @@ impl From<&dyn AccountInfo> for DBAccount {
 }
 
 #[derive(Debug, Clone, Default, sqlx::FromRow, serde::Serialize, serde::Deserialize)]
+#[sqlx(default)]
 pub struct DBInvestorGroup {
-    pub group_id: i64,
     pub group_name: String,
     pub group_desc: String,
     pub created_at: Option<chrono::NaiveDateTime>,
     pub deleted_at: Option<chrono::NaiveDateTime>,
+    #[sqlx(skip)]
     pub investors: Vec<DBInvestor>,
 }
 
 #[derive(Debug, Clone, Default, sqlx::FromRow, serde::Serialize, serde::Deserialize)]
+#[sqlx(default)]
 pub struct DBInvestor {
     pub broker_id: String,
     pub investor_id: String,
@@ -100,6 +103,7 @@ pub struct DBInvestor {
     pub investor_desc: String,
     pub created_at: Option<chrono::NaiveDateTime>,
     pub deleted_at: Option<chrono::NaiveDateTime>,
+    #[sqlx(skip)]
     pub groups: Vec<DBInvestorGroup>,
 }
 
@@ -131,7 +135,7 @@ lazy_static! {
 }
 
 impl DB {
-    pub async fn open(base_dir: &str, schemas: &[&str]) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn open(base_dir: &str, schemas: &[&str]) -> Result<Self, Box<dyn Error>> {
         open_db(base_dir, schemas).await
     }
 
@@ -139,7 +143,7 @@ impl DB {
         &self,
         accounts: &[T],
         batch_size: usize,
-    ) -> Result<u64, Box<dyn std::error::Error>> {
+    ) -> Result<u64, Box<dyn Error>> {
         if self.is_closed() {
             return Err("DB is closed".into());
         }
@@ -234,7 +238,7 @@ impl DB {
     async fn execute_account_qry(
         &self,
         mut qry_builder: sqlx::QueryBuilder<'_, sqlx::Sqlite>,
-    ) -> Result<Vec<DBAccount>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<DBAccount>, Box<dyn Error>> {
         qry_builder.push(" ORDER BY account_id ASC, trading_day DESC;");
 
         let query = qry_builder.build_query_as::<DBAccount>();
@@ -244,7 +248,7 @@ impl DB {
     pub async fn query_accounts(
         &self,
         accounts: &[&str],
-    ) -> Result<Vec<DBAccount>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<DBAccount>, Box<dyn Error>> {
         if self.is_closed() {
             return Err("DB is closed".into());
         }
@@ -280,7 +284,7 @@ impl DB {
         accounts: &[&str],
         start_date: Option<&str>,
         end_date: Option<&str>,
-    ) -> Result<Vec<DBAccount>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<DBAccount>, Box<dyn Error>> {
         if self.is_closed() {
             return Err("DB is closed".into());
         }
@@ -326,7 +330,7 @@ impl DB {
 
     pub async fn query_investors(
         &self, include_all: bool,
-    ) -> Result<Vec<DBInvestor>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<DBInvestor>, Box<dyn Error>> {
         if self.is_closed() {
             return Err("DB is closed".into());
         }
@@ -337,19 +341,19 @@ impl DB {
             r#"WITH investors AS (
     SELECT
         u.broker_id, u.investor_id, u.investor_name, u.investor_desc,
-        g.group_id, g.group_name, g.group_desc
+        g.group_name, g.group_desc
     FROM meta.investor_info as u
     INNER JOIN meta.investor_group as r
     ON u.investor_id = r.investor_id AND u.broker_id = r.broker_id AND u.deleted_at IS NULL
     INNER JOIN meta.group_info as g
-    ON g.group_id = r.group_id AND g.deleted_at IS NULL
+    ON g.group_name = r.group_name AND g.deleted_at IS NULL
     WHERE r.deleted_at IS NULL
 )
 SELECT * FROM investors
 UNION ALL
 SELECT
     DISTINCT broker_id, account_id AS investor_id, '' AS investor_name, '' AS investor_desc,
-    -1 AS group_id, '' AS group_name, '' AS group_desc
+    '' AS group_name, '' AS group_desc
 FROM fund.account
 WHERE $1 AND account_id NOT IN (SELECT investor_id FROM investors)
 ORDER BY broker_id, investor_id;"#
@@ -362,6 +366,7 @@ ORDER BY broker_id, investor_id;"#
         if rows.is_empty() { return Ok(Vec::new()); }
         
         let mut investors: Vec<DBInvestor> = Vec::with_capacity(rows.len());
+
         for row in rows {
             let broker_id = row.get("broker_id");
             let investor_id = row.get("investor_id");
@@ -381,13 +386,13 @@ ORDER BY broker_id, investor_id;"#
                 });
             }
 
-            let group_id = row.get("group_id");
-            if group_id > 0 {
+            let group_name: String = row.get("group_name");
+
+            if group_name.is_empty() {
                 let idx = investors.len() - 1;
                 let investor = &mut investors[idx];
                 investor.groups.push(DBInvestorGroup{
-                    group_id,
-                    group_name: row.get("group_name"),
+                    group_name: group_name.clone(),
                     group_desc: row.get("group_desc"),
                     created_at: None,
                     deleted_at: None,
@@ -399,12 +404,89 @@ ORDER BY broker_id, investor_id;"#
         Ok(investors)
     }
 
+    pub async fn mod_group_investors(
+        &self, group_name: &str, group_desc: Option<&str>,
+        investors: &[DBInvestor],
+    ) -> Result<DBInvestorGroup, Box<dyn Error>> {
+        if group_name.is_empty() {
+            return Err("Group name is empty".into());
+        }
+
+        let desc = group_desc.unwrap_or("");
+
+        log::info!("inserting group: {}", group_name);
+        let mut group = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            r#"INSERT OR REPLACE INTO meta.group_info(group_name, group_desc)"#
+        ).push_values(
+            [(group_name, desc)],
+            |mut b, values| {
+                b.push_bind(values.0)
+                    .push_bind(values.1);
+            }
+        ).push(r#"RETURNING group_name, group_desc, created_at, deleted_at;"#)
+            .build_query_as::<DBInvestorGroup>()
+            .fetch_one(&self.pool)
+            .await?;
+
+        if !investors.is_empty() {
+            log::info!("inserting for group investors: {:?}", investors);
+
+            let result_investors = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+                r#"INSERT OR REPLACE INTO meta.investor_info(
+    broker_id, investor_id, investor_name, investor_desc)"#
+            ).push_values(
+                investors.iter().filter_map(|v| {
+                    if v.broker_id.is_empty() || v.investor_id.is_empty() {
+                        log::warn!("investor data is incomplete, filtered out: {:?}", v);
+                        None
+                    } else {
+                        Some((
+                            v.broker_id.as_str(),
+                            v.investor_id.as_str(),
+                            v.investor_name.as_str(),
+                            v.investor_desc.as_str(),
+                        ))
+                    }
+                }),
+                |mut b, values| {
+                    b.push_bind(values.0)
+                        .push_bind(values.1)
+                        .push_bind(values.2)
+                        .push_bind(values.3);
+                }
+            ).build_query_as::<DBInvestor>()
+                .fetch_all(&self.pool)
+                .await?;
+
+            sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+                r#"INSERT OR IGNORE INTO meta.investor_group(group_name, broker_id, investor_id) "#
+            ).push_values(
+                result_investors.iter().map(|v| {
+                    (group_name, v.broker_id.as_str(), v.investor_id.as_str())
+                }),
+                |mut b, values| {
+                    b.push_bind(values.0)
+                        .push_bind(values.1)
+                        .push_bind(values.2);
+                }
+            ).build()
+                .execute(&self.pool)
+                .await?;
+
+            group.investors = result_investors;
+        }
+
+        Ok(group)
+    }
+
     pub fn is_closed(&self) -> bool {
         self.pool.is_closed()
     }
 }
 
-pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std::error::Error>> {
+pub async fn open_db(
+    base_dir: &str, schemas: &[&str],
+) -> Result<DB, Box<dyn Error>> {
     let mut schema_cache = HashMap::with_capacity(schemas.len());
 
     for v in schemas {
@@ -459,7 +541,7 @@ pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn std
 
 pub async fn create_db(
     base_dir: &str, sql_dir: &str, schemas: &[&str],
-) -> Result<DB, Box<dyn std::error::Error>> {
+) -> Result<DB, Box<dyn Error>> {
     let mut schema_set = HashSet::with_capacity(schemas.len());
 
     for v in schemas {
@@ -475,9 +557,9 @@ pub async fn create_db(
 
         let sql_base = PathBuf::from(sql_dir)
             .join(schema);
-        
+
         let db_file_path = db_path.to_str().unwrap();
-        
+
         if !sqlx::Sqlite::database_exists(db_file_path).await? {
             sqlx::Sqlite::create_database(db_file_path).await?;
         }
@@ -659,5 +741,35 @@ mod test {
         for v in result {
             log::info!("{:?}", v);
         }
+    }
+
+    #[test]
+    fn test_mod_group_investors() {
+        env_logger::Builder::new()
+            .filter_level(log::LevelFilter::Debug)
+            .target(env_logger::Target::Stdout)
+            .init();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let db = rt.block_on(open_db("../data", &["fund", "meta"]))
+            .unwrap();
+
+        let g = rt.block_on(db.mod_group_investors(
+            "test2", None, &[DBInvestor{
+                broker_id: "5100".to_string(),
+                investor_id: "123456".to_string(),
+                investor_name: "test".to_string(),
+                investor_desc: Default::default(),
+                created_at: None,
+                deleted_at: None,
+                groups: vec![],
+            }],
+        )).unwrap();
+
+        log::info!("{:?}", g);
     }
 }
