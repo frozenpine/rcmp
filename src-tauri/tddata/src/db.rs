@@ -6,6 +6,7 @@ use std::fs;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use sqlx::migrate::MigrateDatabase;
 
 pub trait AccountInfo: Send + Sync {
     fn get_trading_day(&self) -> String;
@@ -474,11 +475,17 @@ pub async fn create_db(
 
         let sql_base = PathBuf::from(sql_dir)
             .join(schema);
+        
+        let db_file_path = db_path.to_str().unwrap();
+        
+        if !sqlx::Sqlite::database_exists(db_file_path).await? {
+            sqlx::Sqlite::create_database(db_file_path).await?;
+        }
 
         let conn = SqlitePoolOptions::new()
             .min_connections(1)
             .max_connections(1)
-            .connect(db_path.to_str().unwrap())
+            .connect(db_file_path)
             .await?;
 
         let structure_sql_path = sql_base

@@ -24,9 +24,9 @@ const selected = defineModel<string | string[] | undefined>("selected");
 const showEditor = ref(false);
 const investorLoading = ref(false);
 
-function loadGroupInvestors() {
+function loadGroupInvestors(force: boolean=false) {
   investorLoading.value = true;
-  meta.doQueryInvestors(true)
+  meta.doQueryInvestors(true, {force: force})
       .then((investors) => {
         message.info(`已获取全部投资者信息【${investors.length}】`)
       }).catch((err) => {
@@ -41,10 +41,6 @@ function loadGroupInvestors() {
 defineExpose({
   loadGroupInvestors,
 });
-
-export interface InvestorSelectorInst {
-  loadGroupInvestors(): void;
-}
 
 const selectOptions = computed(() => {
   return meta.groupInvestors.map((g) => {
@@ -75,7 +71,7 @@ const selectOptions = computed(() => {
     <template #action>
       <n-space justify="end">
         <n-button-group size="tiny">
-          <n-button @click="loadGroupInvestors" round>
+          <n-button @click="loadGroupInvestors(true)" round>
             <template #icon><RefreshFilled/></template>
             刷新
           </n-button>
