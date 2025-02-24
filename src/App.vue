@@ -4,7 +4,7 @@ import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop,
   NSpace, NButton, NCard, NIcon,
-  NForm, NFormItem,
+  NForm, NFormItem, NPopover,
 } from "naive-ui";
 import { Search, ArrowBigUpLine } from "@vicons/tabler"
 
@@ -12,48 +12,33 @@ import Feedback from "./components/Feedback.vue"
 import AccountTable from "./components/AccountTable.vue"
 import TUAccountSinker from "./components/TUAccountSinker.vue"
 import InvestorSelector from "./components/InvestorSelector.vue"
-import { useMessage } from "./utils/feedback.ts"
 
 import { fundStore } from "./store/fund.ts";
-import { metaStore } from "./store/meta.ts";
 
 const fund = fundStore();
-const meta = metaStore();
 
 const osTheme = useOsTheme();
 
 const accountLoading = ref(false);
-const investorLoading = ref(false);
-const selectedInvestor = ref<string>(undefined);
+const investorSelectorRef = ref(undefined);
+const selectedInvestor = ref<string>("");
 
 const selectedInvestorAccounts = computed(() => {
   return fund.getInvestorAccounts(selectedInvestor.value);
 })
 
-function queryAccounts() {
+function queryAccounts(force: boolean = false) {
   if (!selectedInvestor.value) return;
 
   accountLoading.value = true;
 
-  fund.doQueryAccounts(selectedInvestor.value)
+  fund.doQueryAccounts(selectedInvestor.value, {force: force})
       .catch(console.error)
       .finally(() => accountLoading.value = false);
 }
 
 onMounted(() => {
-  const message = useMessage();
-
-  investorLoading.value = true;
-  meta.doQueryInvestors(true)
-      .then((investors) => {
-        message.info(`已获取全部投资者信息【${investors.length}】`)
-      }).catch((err) => {
-        console.error("query investors failed:", err)
-        message.error("投资者查询失败", {
-          closable: true,
-          duration: 0,
-        })
-      }).finally(()=>investorLoading.value = false);
+  investorSelectorRef.value?.loadGroupInvestors();
 })
 </script>
 
@@ -67,14 +52,22 @@ onMounted(() => {
             <TUAccountSinker />
           </template>
           <n-form class="query" :disabled="accountLoading" inline>
-            <n-form-item><InvestorSelector v-model:selected="selectedInvestor" :loading="investorLoading"/></n-form-item>
+            <n-form-item><InvestorSelector ref="investorSelectorRef" v-model:selected="selectedInvestor" /></n-form-item>
             <n-form-item>
-              <n-button attr-type="submit" @click="queryAccounts" :disabled="!selectedInvestor" type="info" >
-                <template #icon>
-                  <n-icon><Search/></n-icon>
-                </template>
-                查询
-              </n-button>
+<!--              <n-popover trigger="hover" :delay="500" :duration="1000" placement="bottom-end">-->
+<!--                <template #trigger>-->
+                  <n-button attr-type="submit"
+                            @click.exact.stop="queryAccounts(false)"
+                            @click.ctrl.exact.stop="queryAccounts(true)"
+                            :disabled="!selectedInvestor" type="info" >
+                    <template #icon>
+                      <n-icon><Search/></n-icon>
+                    </template>
+                    查询
+                  </n-button>
+<!--                </template>-->
+<!--                按住Ctrl点击，强制从数据库刷新-->
+<!--              </n-popover>-->
             </n-form-item>
           </n-form>
         </n-card>

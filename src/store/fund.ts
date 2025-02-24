@@ -34,7 +34,7 @@ export const fundStore = defineStore("fund", {
                 if (!force && !startDate && !endDate && this.accounts.has(accounts)) {
                     console.log("query account hit data cache:", accounts);
 
-                    resolve(this.getInvestorAccounts(accounts))
+                    resolve(this.getInvestorAccounts(accounts)!)
                 } else {
                     console.log("query account from database:", accounts);
 
