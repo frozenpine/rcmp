@@ -32,6 +32,26 @@ async fn query_investors(include_all: bool, state: State<'_, Mutex<Config>>) -> 
 }
 
 #[tauri::command]
+async fn mod_group_investors(
+    group_name: &str,
+    group_desc: Option<&str>,
+    investors: Vec<db::DBInvestor>,
+    state: State<'_, Mutex<Config>>,
+) -> Result<db::DBInvestorGroup, String> {
+    let cfg = state.lock().await;
+
+    match cfg._db.as_ref() {
+        Some(db) => db.mod_group_investors(
+                group_name, group_desc, &investors,
+            ).await.map_err(|e| {
+                log::error!("mod group investors failed: {:?}", e);
+                "mod group investors failed".to_string()
+            }),
+        None => Err("no database initialized.".into())
+    }
+}
+
+#[tauri::command]
 async fn sink_tu_account_dir(
     base_dir: &str, accounts: Vec<&str>, state: State<'_, Mutex<Config>>,
 ) -> Result<u64, String> {
@@ -164,6 +184,7 @@ pub fn run() {
             sink_tu_account_files,
             query_accounts,
             query_investors,
+            mod_group_investors,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

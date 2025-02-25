@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import {NTreeSelect, NSpace, NButton, NIcon, NModalProvider, NModal, NButtonGroup} from "naive-ui";
 import {RefreshFilled, EditNoteFilled} from "@vicons/material";
-import {computed, ref} from "vue";
+import {computed, ref, h} from "vue";
+import dayjs from "dayjs"
 
 import {metaStore} from "../store/meta.ts";
 import GroupEditor from "../components/GroupEditor.vue"
-import {useMessage} from "../utils/feedback.ts"
+import {useMessage, useNotification} from "../utils/feedback.ts"
 
 interface SelectProps {
   loading?: boolean;
@@ -19,6 +20,7 @@ const {
 
 const meta = metaStore();
 const message = useMessage();
+const notification = useNotification();
 
 const selected = defineModel<string | string[] | undefined>("selected");
 const showEditor = ref(false);
@@ -28,14 +30,30 @@ function loadGroupInvestors(force: boolean=false) {
   investorLoading.value = true;
   meta.doQueryInvestors(true, {force: force})
       .then((investors) => {
-        message.info(`已获取全部投资者信息【${investors.length}】`)
+        const group_investors = meta.groupInvestors;
+        notification.info({
+          title: "投资者组查询完成",
+          description: `投资者账号总计: ${investors.length}`,
+          content: () => h(
+              NSpace, {vertical: true},
+              {
+                default: () => group_investors.map(
+                    (g) => h("span", `投资者组[${g.group_name}]账号合计: ${g.investors?.length}`)
+                )
+              },
+            ),
+          meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+          duration: 10000,
+        })
       }).catch((err) => {
-    console.error("query investors failed:", err)
-    message.error("投资者查询失败", {
-      closable: true,
-      duration: 0,
-    })
-  }).finally(()=>investorLoading.value = false);
+        console.error("query investors failed:", err);
+        notification.error({
+          title: "投资者组查询错误",
+          content: err.message,
+          closable: false,
+          meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+        })
+      }).finally(()=>investorLoading.value = false);
 }
 
 defineExpose({
@@ -46,10 +64,10 @@ const selectOptions = computed(() => {
   return meta.groupInvestors.map((g) => {
     return {
       label: g.group_name,
-      key: g.group_id,
-      children: g.investors!.map((v) => {
+      key: g.group_name,
+      children: g.investors?.map((v) => {
         return {
-          label: `${v.investor_name? v.investor_name : '未命名'} (${v.investor_id})`,
+          label: `${v.investor_name} (${v.investor_id})`,
           key: v.investor_id,
         }
       }),

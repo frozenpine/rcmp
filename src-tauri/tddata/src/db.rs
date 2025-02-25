@@ -483,7 +483,19 @@ ORDER BY broker_id, investor_id;"#
                         .push_bind(values.1)
                         .push_bind(values.2);
                 }
+            ).push(
+                r#"; UPDATE meta.investor_group SET deleted_at = CURRENT_TIMESTAMP
+WHERE group_name = $1 AND (broker_id, investor_id) NOT IN"#
+            ).push_tuples(
+                investors.iter().map(|v| {
+                    (v.broker_id.as_str(), v.investor_id.as_str())
+                }),
+                |mut b, values| {
+                    b.push_bind(values.0)
+                        .push_bind(values.1);
+                }
             ).build()
+                .bind(group_name)
                 .execute(&self.pool)
                 .await?;
         }
@@ -771,7 +783,7 @@ mod test {
             .unwrap();
 
         let g = rt.block_on(db.mod_group_investors(
-            "test2", None, &[DBInvestor{
+            "test", None, &[DBInvestor{
                 broker_id: "5100".to_string(),
                 investor_id: "123456".to_string(),
                 investor_name: "test".to_string(),

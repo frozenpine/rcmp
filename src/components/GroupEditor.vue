@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import {computed, ref, h} from "vue";
+import {computed, ref, h, nextTick} from "vue";
 import {NTransfer, NCard, NSpace, NButton, NSelect, NInput} from "naive-ui";
 import type {TransferOption, TransferRenderTargetLabel } from "naive-ui"
 
 import {metaStore} from "../store/meta.ts"
 import {DBInvestor} from "../models/db.ts";
+import {useMessage} from "../utils/feedback.ts";
 
-class InvestorProxy implements TransferOption, DBInvestor {
+class InvestorProxy implements TransferOption {
   private _inner: DBInvestor
   investor_name?: string
   investor_desc?: string
@@ -42,8 +43,10 @@ class InvestorProxy implements TransferOption, DBInvestor {
 }
 
 const meta = metaStore();
-const selectedGroup = ref<string | number | undefined>(undefined);
+const message = useMessage();
+const selectedGroup = ref<string | undefined>(undefined);
 const selectedInvestors = ref<string[] | undefined>(undefined);
+const updating = ref(false);
 
 const emit = defineEmits(["close"]);
 
@@ -54,8 +57,6 @@ const groupName = computed(()=>{
     }
     return "请选择投资者组";
   }
-
-  if (typeof selectedGroup.value === "string") return selectedGroup.value;
 
   const group = meta.getGroup(selectedGroup.value);
 
@@ -68,11 +69,11 @@ const groupName = computed(()=>{
 
 const groupOptions = computed(() => {
   return meta.groupInvestors.filter(
-      g => g.group_id > 0
+      g => g.group_name != "未分组"
   ).map((g) => {
     return {
       label: g.group_name,
-      value: g.group_id,
+      value: g.group_name,
     }
   });
 })
@@ -113,11 +114,22 @@ const targetLabelRender: TransferRenderTargetLabel = function({option}) {
 function investorsCommit() {
   if (!selectedGroup.value) {return;}
 
-  selectedInvestors.value!.forEach((v) => {
-    const find = transferOptions.value.filter(g => g.investor_id === v)[0];
-
-    console.log(v, find);
-  })
+  updating.value = true;
+  meta.doModifyGroup(
+      selectedGroup.value,
+      {
+        investors: selectedInvestors.value.map(
+            (v) => meta.getInvestor(v)
+        )
+      }
+  ).then((group) => {
+    console.log("group updated:", group);
+    message.info(`投资者组[${group.group_name}]已更新`);
+    nextTick(()=>{emit('close')});
+  }).catch((err) => {
+    console.error("investor group update failed:", err);
+    message.error(`投资者组[${selectedGroup.value}]更新失败`);
+  }).finally(() => {updating.value = false;});
 }
 </script>
 
@@ -131,12 +143,11 @@ function investorsCommit() {
                 source-title="投资者账号" :target-title="groupName"
                 :render-target-label="targetLabelRender"
                 :disabled="!selectedGroup"
-                @update:value="console.log(selectedInvestors)"
                 source-filterable target-filterable virtual-scroll>
     </n-transfer>
     <template #action>
       <n-space justify="end">
-        <n-button @click="investorsCommit">确定</n-button>
+        <n-button @click="investorsCommit" :loading="updating">确定</n-button>
       </n-space>
     </template>
   </n-card>

@@ -2,17 +2,16 @@
 import {ref, onMounted, computed} from "vue";
 import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
 import {
-  NConfigProvider, NMessageProvider, NBackTop,
-  NSpace, NButton, NCard, NIcon,
+  NConfigProvider, NMessageProvider, NBackTop, NNotificationProvider,
+  NSpace, NButton, NCard, NIcon, NPopover,
   NForm, NFormItem,
 } from "naive-ui";
-import { Search, ArrowBigUpLine } from "@vicons/tabler"
+import { Search, ArrowBigUpLine, InfoCircle } from "@vicons/tabler"
 
 import Feedback from "./components/Feedback.vue"
 import AccountTable from "./components/AccountTable.vue"
 import TUAccountSinker from "./components/TUAccountSinker.vue"
 import InvestorSelector from "./components/InvestorSelector.vue"
-// import type {InvestorSelectorInst} from "./components/InvestorSelectorInst.vue"
 
 import { fundStore } from "./store/fund.ts";
 
@@ -21,7 +20,6 @@ const fund = fundStore();
 const osTheme = useOsTheme();
 
 const accountLoading = ref(false);
-// const investorSelectorRef = ref<InvestorSelectorInst>(undefined);
 const investorSelectorRef = ref(undefined);
 const selectedInvestor = ref<string>("");
 
@@ -46,7 +44,8 @@ onMounted(() => {
 
 <template>
   <n-config-provider :theme="osTheme==='dark'? darkTheme : null" :locale="zhCN" :date-locale="dateZhCN">
-    <n-message-provider><Feedback/></n-message-provider>
+    <n-message-provider><Feedback :message="true" /></n-message-provider>
+    <n-notification-provider><Feedback :notification="true" /></n-notification-provider>
     <n-space vertical class="container">
       <n-space align="center" justify="center">
         <n-card title="Welcome to RCMP" size="huge" hoverable >
@@ -56,15 +55,23 @@ onMounted(() => {
           <n-form class="query" :disabled="accountLoading" inline>
             <n-form-item><InvestorSelector ref="investorSelectorRef" v-model:selected="selectedInvestor" /></n-form-item>
             <n-form-item>
-              <n-button attr-type="submit"
-                        @click.exact.stop="queryAccounts(false)"
-                        @click.ctrl.exact.stop="queryAccounts(true)"
-                        :disabled="!selectedInvestor" type="info" >
-                <template #icon>
-                  <n-icon><Search/></n-icon>
-                </template>
-                查询
-              </n-button>
+              <n-space align="baseline">
+                <n-button attr-type="submit"
+                          @click.exact.stop="queryAccounts(false)"
+                          @click.ctrl.exact.stop="queryAccounts(true)"
+                          :disabled="!selectedInvestor" type="info" >
+                  <template #icon>
+                    <n-icon><Search/></n-icon>
+                  </template>
+                  查询
+                </n-button>
+                <n-popover placement="bottom-start">
+                  <template #trigger>
+                    <n-icon size="20" :depth="3"><InfoCircle/></n-icon>
+                  </template>
+                  按住Ctrl点击, 强制从数据库刷新
+                </n-popover>
+              </n-space>
             </n-form-item>
           </n-form>
         </n-card>

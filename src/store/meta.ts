@@ -2,16 +2,15 @@ import {defineStore} from "pinia";
 import dayjs from "dayjs"
 import { invoke } from "@tauri-apps/api/core";
 
-import { Vacation, ProductInfo, DBInvestor, DBGroup } from "../models/db.ts"
+import { Vacation, DBInvestor, DBGroup } from "../models/db.ts"
 
 export const metaStore = defineStore("meta", {
     state: () => {
         return {
             holidays: new Map([]) as Map<string, Vacation>,
-            products: new Map([]) as Map<string, ProductInfo>,
             investors: new Map([]) as Map<string, DBInvestor>,
-            groups: new Map([]) as Map<number, DBGroup>,
-            ungrouped: [] as Array<DBInvestor>
+            groups: new Map([]) as Map<string, DBGroup>,
+            ungrouped: new Map([]) as Map<string, DBInvestor>,
         }
     },
     getters: {
@@ -30,8 +29,8 @@ export const metaStore = defineStore("meta", {
             }
         },
         getGroup: (state) => {
-            return (gid: number): DBGroup|undefined => {
-                return state.groups.get(gid);
+            return (name: string): DBGroup|undefined => {
+                return state.groups.get(name);
             }
         },
         getInvestor: (state) => {
@@ -45,9 +44,8 @@ export const metaStore = defineStore("meta", {
         },
         groupInvestors: (state): DBGroup[] => {
             return [...state.groups.values()].concat([{
-                group_id: -1,
                 group_name: "未分组",
-                investors: state.ungrouped,
+                investors: [...state.ungrouped.values()],
             } as DBGroup])
         }
     },
@@ -73,24 +71,24 @@ export const metaStore = defineStore("meta", {
 
                         this.investors.clear();
                         this.groups.clear();
-                        this.ungrouped.length = 0;
+                        this.ungrouped.clear();
 
                         investors.forEach((v) => {
-                            this.investors.set(
-                                [v.broker_id, v.investor_id].join("."),
-                                v
-                            );
+                            const idt = [v.broker_id, v.investor_id].join(".");
+                            this.investors.set(idt, v);
 
                             if (v.groups && v.groups.length > 0) {
                                 v.groups?.forEach((g) => {
-                                    if (!this.groups.has(g.group_id)) {
-                                        this.groups.set(g.group_id, Object.assign({}, g));
+                                    if (!this.groups.has(g.group_name)) {
+                                        this.groups.set(g.group_name, Object.assign(g, {
+                                            investors: [],
+                                        }));
                                     }
 
-                                    this.groups.get(g.group_id)!.investors!.push(v);
+                                    this.groups.get(g.group_name)!.investors!.push(v);
                                 })
                             } else {
-                                this.ungrouped.push(v)
+                                this.ungrouped.set(idt, v)
                             }
                         })
 
@@ -99,12 +97,36 @@ export const metaStore = defineStore("meta", {
                 }
             });
         },
-        // async doModifyGroup(group_name: string, {
-        //     group_id = -1,
-        //     investors,
-        // }: {
-        //     group_id?: number,
-        //     investors?: DBInvestor[],
-        // }): Promise<DBGroup> {},
+        async doModifyGroup(group_name: string, {
+            investors,
+        }: {
+            investors?: DBInvestor[],
+        }): Promise<DBGroup> {
+            return new Promise((resolve, reject) => {
+                if (group_name === "") reject("group name is empty")
+
+                invoke("mod_group_investors", {
+                    groupName: group_name,
+                    groupDesc: "",
+                    investors: investors?.map(v => {
+                        return {
+                            broker_id: v.broker_id,
+                            investor_id: v.investor_id,
+                            investor_name: v.investor_name,
+                            investor_desc: v.investor_desc,
+                        }
+                    }),
+                }).then((g) => {
+                    const group = g as DBGroup;
+                    this.groups.set(group.group_name, group)
+
+                    group.investors?.forEach((v) => {
+                        const idt = [v.broker_id, v.investor_id].join(".")
+                        this.ungrouped.delete(idt);
+                    })
+                    resolve(group);
+                }).catch(reject);
+            })
+        },
     }
 })
