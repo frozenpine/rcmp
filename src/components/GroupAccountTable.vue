@@ -88,22 +88,6 @@ const defaultColumns: DataTableColumns<DBAccount> = [
   {title: "币种", key: "currency_id", fixed: "right", width: 60, titleAlign: "center", align: "right"},
 ]
 
-class AccountProxy {
-  private readonly _inner: DBAccount
-
-  constructor(inner: DBAccount) {
-    this._inner = inner;
-
-    for (const key in inner) {
-      Object.assign(this, {[key]: this._inner[key]});
-    }
-  }
-
-  get group_name(): string {
-    return group_name;
-  }
-}
-
 const groupedData = computed(() => {
   if (!data || data.length < 1) return [];
 
@@ -117,7 +101,7 @@ const groupedData = computed(() => {
     if (groups.size === 0 || !groups.has(group_name)) return false;
 
     return latest ? v.trading_day === lastDate.value.format("YYYYMMDD") : true
-  }).map(v => new AccountProxy(v));
+  });
 })
 
 const dt = ref<DataTableInst>();
