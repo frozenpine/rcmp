@@ -47,11 +47,13 @@ function queryAccounts(force: boolean = false) {
   accountLoading.value = true;
 
   if (isGroup.value) {
-    fund.doQueryGroup(selected.value)
+    fund.doQueryGroup(selected.value, {force: force})
+        .then(console.log)
         .catch(console.error)
         .finally(() => accountLoading.value = false);
   } else {
     fund.doQueryAccounts(selected.value, {force: force})
+        .then(console.log)
         .catch(console.error)
         .finally(() => accountLoading.value = false);
   }
@@ -111,12 +113,12 @@ onMounted(() => {
       <template #footer>
         <n-form class="query" :disabled="accountLoading" inline>
           <n-form-item>
-            <n-switch v-model:value="isGroup">
-              <template #checked>
-                组选择
+            <n-switch v-model:value="isGroup" @update:value="()=> selected = ''">
+              <template #checked-icon>
+                <n-icon><ContactCardGroup16Filled/></n-icon>
               </template>
-              <template #unchecked>
-                投资者选择
+              <template #unchecked-icon>
+                <n-icon size="10"><UserAlt/></n-icon>
               </template>
             </n-switch>
           </n-form-item>

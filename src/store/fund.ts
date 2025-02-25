@@ -136,13 +136,17 @@ export const fundStore = defineStore("fund", {
                     result.push(...this.accounts.get(k))
                 })
 
+                console.log("query groups:", persistent_accounts, exist_accounts, query_accounts)
+
                 if (exist_accounts.size > 0) {
                     console.log("query group hit data cache:", group_name, exist_accounts);
-                } else {
+                } else if (query_accounts.size > 0) {
                     console.log("query group from database:", group_name, query_accounts);
 
                     invoke("query_accounts", {
-                        accounts: [...query_accounts],
+                        accounts: [...query_accounts].map((v) => {
+                            return v.split(".", 2)[1];
+                        }),
                         startDate: startDate,
                         endDate: endDate,
                     }).then((values) => {
@@ -152,6 +156,8 @@ export const fundStore = defineStore("fund", {
                         resolve(result);
                     }).catch(reject);
                 }
+
+                resolve(result);
             })
         },
         async doSinkTuAccount(

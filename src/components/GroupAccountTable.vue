@@ -19,7 +19,7 @@ interface GroupAccountTableProps {
 }
 
 const {
-  group_name = "",
+  group_name,
   loading = false,
   latest = false,
   data,
@@ -34,7 +34,6 @@ const message = useMessage();
 const {lastDate} = storeToRefs(fund);
 
 const defaultColumns: DataTableColumns<DBAccount> = [
-  {title: "投资者组", key: "group_name", fixed: "left", width: 60, titleAlign: "center"},
   {title: "资金账号", key: "account_id", fixed: "left", width: 100, titleAlign: "center"},
   {title: "账号名称", key: "account_name", fixed: "left", width: 100, titleAlign: "center"},
   {title: "交易日", key: "trading_day", fixed: "left", width: 100, titleAlign: "center"},
