@@ -1,33 +1,40 @@
 <script setup lang="ts">
-import {
-  type DataTableColumns, type DataTableInst,
-  NDataTable, NDropdown, NWatermark,
-} from "naive-ui";
-import {computed, h, nextTick, reactive, ref} from "vue";
+import {type DataTableColumns, type DataTableInst, NDataTable, NDropdown, NWatermark} from "naive-ui";
+import {h, nextTick, ref, computed} from "vue";
 import dayjs from "dayjs";
 
-import {DBAccount} from "../models/db.ts";
 import {CurrencyFormatter} from "../utils/formatter.ts";
 import {useMessage} from "../utils/feedback.ts";
+import {DBAccount} from "../models/db.ts";
+import {fundStore} from "../store/fund.ts";
+import {metaStore} from "../store/meta.ts";
+import {storeToRefs} from "pinia";
 
-interface AccountTableProps {
+interface GroupAccountTableProps {
+  group_name?: string;
   loading?: boolean;
+  latest?: boolean;
   data?: DBAccount[];
-  pageSizes?: number[];
   watermark?: string;
 }
 
 const {
+  group_name = "",
   loading = false,
+  latest = false,
   data,
-  pageSizes = [5, 10, 15, 50],
   watermark = "瑞达期货",
-} = defineProps<AccountTableProps>();
+} = defineProps<GroupAccountTableProps>();
 
+const fund = fundStore();
+const meta = metaStore();
 const CNY = CurrencyFormatter();
 const message = useMessage();
 
+const {lastDate} = storeToRefs(fund);
+
 const defaultColumns: DataTableColumns<DBAccount> = [
+  {title: "投资者组", key: "group_name", fixed: "left", width: 60, titleAlign: "center"},
   {title: "资金账号", key: "account_id", fixed: "left", width: 100, titleAlign: "center"},
   {title: "账号名称", key: "account_name", fixed: "left", width: 100, titleAlign: "center"},
   {title: "交易日", key: "trading_day", fixed: "left", width: 100, titleAlign: "center"},
@@ -82,37 +89,45 @@ const defaultColumns: DataTableColumns<DBAccount> = [
   {title: "币种", key: "currency_id", fixed: "right", width: 60, titleAlign: "center", align: "right"},
 ]
 
-const calcPageSizes = computed(()=>{
-  if (!data || data.length < 1) {
-    return pageSizes;
-  }
+class AccountProxy {
+  private readonly _inner: DBAccount
 
-  for (let idx = 0; idx < pageSizes.length; idx++) {
-    if (pageSizes[idx] > data.length) {
-      if (idx > 0) {
-        return pageSizes.slice(0, idx).concat([data.length]);
-      } else {
-        return [data.length];
-      }
+  constructor(inner: DBAccount) {
+    this._inner = inner;
+
+    for (const key in inner) {
+      Object.assign(this, {[key]: this._inner[key]});
     }
   }
 
-  return pageSizes.concat([data.length]);
+  get group_name(): string {
+    return group_name;
+  }
+}
+
+const groupedData = computed(() => {
+  if (!data || data.length < 1) return [];
+
+  return data.filter((v) => {
+    const investor = meta.getInvestor(v.account_id, v.broker_id);
+
+    if (!investor) return false;
+
+    const groups = new Set(investor!.groups?.map(v => v.group_name));
+
+    if (groups.size === 0 || !groups.has(group_name)) return false;
+
+    return latest ? v.trading_day === lastDate.value.format("YYYYMMDD") : true
+  }).map(v => new AccountProxy(v));
 })
 
-const pagination = reactive({
-  page: 1,
-  pageSize: calcPageSizes.value[0] || 5,
-  showSizePicker: true,
-  pageSizes: calcPageSizes,
-  onChange: (page: number) => {pagination.page = page},
-  onUpdatePageSize: (pageSize: number) => {
-    pagination.pageSize = pageSize;
-    pagination.page = 1;
-  }
-});
 const dt = ref<DataTableInst>();
 const contextMenu = ref<{x: number; y: number; show: boolean}>({x: 0, y: 0, show: false});
+
+const getRowKey = (row: any): string => {
+  const data = row as DBAccount;
+  return [data.trading_day, data.broker_id, data.account_id, data.currency_id].join(".")
+}
 
 function handleMenuSelect(sel: string) {
   contextMenu.value.show = false;
@@ -121,24 +136,10 @@ function handleMenuSelect(sel: string) {
 
   switch (sel) {
     case "all": {
-      const {page, pageSize} = pagination;
-      pagination.pageSize = pagination.pageSizes[pagination.pageSizes.length - 1];
-      pagination.page = 1;
-
       nextTick().then(()=>{
         dt.value?.downloadCsv({
           fileName: `account_all_${now}.csv`,
         });
-
-        pagination.pageSize = pageSize;
-        pagination.page = page;
-      })
-      break;
-    }
-    case "page": {
-      dt.value?.downloadCsv({
-        fileName: `account_partial_${now}.csv`,
-        keepOriginalData: false,
       })
       break;
     }
@@ -148,11 +149,6 @@ function handleMenuSelect(sel: string) {
       break;
     }
   }
-}
-
-const getRowKey = (row: any): string => {
-  const data = row as DBAccount;
-  return [data.trading_day, data.broker_id, data.account_id, data.currency_id].join(".")
 }
 
 const rowProps = (_: DBAccount) => {
@@ -168,6 +164,7 @@ const rowProps = (_: DBAccount) => {
     }
   }
 }
+
 </script>
 
 <template>
@@ -180,13 +177,13 @@ const rowProps = (_: DBAccount) => {
                :y-offset="28"
                :rotate="-15"
                cross selectable>
-    <n-data-table ref="dt" :columns="defaultColumns" :data="data" :loading="loading"
-                  :row-key="getRowKey" :pagination="data && data.length > 0? pagination : false" :row-props="rowProps"
+    <n-data-table ref="dt" :columns="defaultColumns" :data="groupedData" :loading="loading"
+                  :row-key="getRowKey" :row-props="rowProps"
                   striped ></n-data-table>
   </n-watermark>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
               :on-clickoutside="() => contextMenu.show = false" @select="handleMenuSelect"
-              :options="[{label: '导出全部', key: 'all'}, {label: '导出当前', key: 'page'}]"></n-dropdown>
+              :options="[{label: '导出全部', key: 'all'}]"></n-dropdown>
 </template>
 
 <style scoped>

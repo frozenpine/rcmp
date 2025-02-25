@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import {computed, ref, h, nextTick} from "vue";
-import {NTransfer, NCard, NSpace, NButton, NSelect, NInput} from "naive-ui";
+import {NTransfer, NCard, NSpace, NButton, NInput} from "naive-ui";
 import type {TransferOption, TransferRenderTargetLabel } from "naive-ui"
 
 import {metaStore} from "../store/meta.ts"
 import {DBInvestor} from "../models/db.ts";
 import {useMessage} from "../utils/feedback.ts";
+import GroupSelector from "../components/GroupSelector.vue";
 
 class InvestorProxy implements TransferOption {
   private _inner: DBInvestor
@@ -62,20 +63,9 @@ const groupName = computed(()=>{
 
   selectedInvestors.value = group?.investors!.map((v) => {
     return v.investor_id;
-  });
+  }) || [];
 
   return group?.group_name;
-})
-
-const groupOptions = computed(() => {
-  return meta.groupInvestors.filter(
-      g => g.group_name != "未分组"
-  ).map((g) => {
-    return {
-      label: g.group_name,
-      value: g.group_name,
-    }
-  });
 })
 
 const transferOptions = computed(() => {
@@ -138,8 +128,7 @@ function investorsCommit() {
 <template>
   <n-card title="投资者组编辑" closable @close="emit('close')">
     <template #header-extra>
-        <n-select v-model:value="selectedGroup" :options="groupOptions"
-                  size="small" tag filterable clearable></n-select>
+        <GroupSelector v-model:selected="selectedGroup"/>
     </template>
     <n-transfer v-model:value="selectedInvestors" :options="transferOptions"
                 source-title="投资者账号" :target-title="groupName"

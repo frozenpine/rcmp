@@ -20,6 +20,7 @@ const {
 
 const meta = metaStore();
 const notification = useNotification();
+const emit = defineEmits(["group"])
 
 const selected = defineModel<string | string[] | undefined>("selected");
 const showEditor = ref(false);
@@ -68,6 +69,7 @@ const selectOptions = computed(() => {
         return {
           label: `${v.investor_name} (${v.investor_id})`,
           key: v.investor_id,
+          group: g,
         }
       }),
     }
@@ -84,6 +86,7 @@ const selectOptions = computed(() => {
   <n-tree-select :loading="loading || investorLoading" v-model:value="selected" :options="selectOptions"
                  :multiple="multiple" check-strategy="child" placeholder="请选择投资者"
                  :override-default-node-click-behavior="({option}) => {return option.children? 'toggleExpand': 'default'}"
+                 :on-update-value="(_, option) => {emit('group', option.group);}"
                  clearable filterable cascade virtual-scroll >
     <template #action>
       <n-space justify="end">
