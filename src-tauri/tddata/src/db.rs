@@ -91,7 +91,7 @@ pub struct DBInvestorGroup {
     pub created_at: Option<chrono::NaiveDateTime>,
     pub deleted_at: Option<chrono::NaiveDateTime>,
     #[sqlx(skip)]
-    pub investors: Vec<DBInvestor>,
+    pub investors: Option<Vec<DBInvestor>>,
 }
 
 #[derive(Debug, Clone, Default, sqlx::FromRow, serde::Serialize, serde::Deserialize)]
@@ -104,7 +104,7 @@ pub struct DBInvestor {
     pub created_at: Option<chrono::NaiveDateTime>,
     pub deleted_at: Option<chrono::NaiveDateTime>,
     #[sqlx(skip)]
-    pub groups: Vec<DBInvestorGroup>,
+    pub groups: Option<Vec<DBInvestorGroup>>,
 }
 
 #[derive(Debug, Clone)]
@@ -340,20 +340,21 @@ impl DB {
         let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             r#"WITH investors AS (
     SELECT
-        u.broker_id, u.investor_id, u.investor_name, u.investor_desc,
-        g.group_name, g.group_desc
-    FROM meta.investor_info as u
-    INNER JOIN meta.investor_group as r
-    ON u.investor_id = r.investor_id AND u.broker_id = r.broker_id AND u.deleted_at IS NULL
-    INNER JOIN meta.group_info as g
-    ON g.group_name = r.group_name AND g.deleted_at IS NULL
-    WHERE r.deleted_at IS NULL
+        u.broker_id, u.investor_id, u.investor_name, u.investor_desc, u.created_at AS inv_create,
+        g.group_name, g.group_desc, g.created_at AS grp_create
+    FROM meta.investor_info u, meta.group_info g
+    INNER JOIN meta.investor_group r
+    ON 
+        u.broker_id = r.broker_id AND
+        u.investor_id = r.investor_id AND 
+        g.group_name = r.group_name AND 
+        u.deleted_at IS NULL AND g.deleted_at IS NULL AND r.deleted_at IS NULL
 )
 SELECT * FROM investors
 UNION ALL
 SELECT
-    DISTINCT broker_id, account_id AS investor_id, '' AS investor_name, '' AS investor_desc,
-    '' AS group_name, '' AS group_desc
+    DISTINCT broker_id, account_id AS investor_id, account_name AS investor_name, '' AS investor_desc, NULL AS inv_create,
+    '' AS group_name, '' AS group_desc, NULL AS grp_create
 FROM fund.account
 WHERE $1 AND account_id NOT IN (SELECT investor_id FROM investors)
 ORDER BY broker_id, investor_id;"#
@@ -380,24 +381,30 @@ ORDER BY broker_id, investor_id;"#
                     investor_id,
                     investor_name: row.get("investor_name"),
                     investor_desc: row.get("investor_desc"),
-                    created_at: None,
+                    created_at: row.get("inv_create"),
                     deleted_at: None,
-                    groups: vec![],
+                    groups: None,
                 });
             }
 
             let group_name: String = row.get("group_name");
 
-            if group_name.is_empty() {
+            if !group_name.is_empty() {
                 let idx = investors.len() - 1;
                 let investor = &mut investors[idx];
-                investor.groups.push(DBInvestorGroup{
-                    group_name: group_name.clone(),
-                    group_desc: row.get("group_desc"),
-                    created_at: None,
-                    deleted_at: None,
-                    investors: vec![],
-                });
+
+                if investor.groups.is_none() {
+                    investor.groups = Some(vec![])
+                }
+
+                investor.groups.as_mut().unwrap()
+                    .push(DBInvestorGroup{
+                        group_name: group_name.clone(),
+                        group_desc: row.get("group_desc"),
+                        created_at: row.get("grp_create"),
+                        deleted_at: None,
+                        investors: None,
+                    });
             }
         }
 
@@ -423,7 +430,7 @@ ORDER BY broker_id, investor_id;"#
                 b.push_bind(values.0)
                     .push_bind(values.1);
             }
-        ).push(r#"RETURNING group_name, group_desc, created_at, deleted_at;"#)
+        ).push("RETURNING group_name, group_desc, created_at, deleted_at;")
             .build_query_as::<DBInvestorGroup>()
             .fetch_one(&self.pool)
             .await?;
@@ -431,7 +438,7 @@ ORDER BY broker_id, investor_id;"#
         if !investors.is_empty() {
             log::info!("inserting for group investors: {:?}", investors);
 
-            let result_investors = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            group.investors = Some(sqlx::QueryBuilder::<sqlx::Sqlite>::new(
                 r#"INSERT OR REPLACE INTO meta.investor_info(
     broker_id, investor_id, investor_name, investor_desc)"#
             ).push_values(
@@ -454,16 +461,23 @@ ORDER BY broker_id, investor_id;"#
                         .push_bind(values.2)
                         .push_bind(values.3);
                 }
+            ).push(
+                "RETURNING broker_id, investor_id, investor_name, investor_desc, created_at, deleted_at;"
             ).build_query_as::<DBInvestor>()
                 .fetch_all(&self.pool)
-                .await?;
+                .await?);
 
+            log::info!("inserting for group investors: {:?}", group.investors);
             sqlx::QueryBuilder::<sqlx::Sqlite>::new(
                 r#"INSERT OR IGNORE INTO meta.investor_group(group_name, broker_id, investor_id) "#
             ).push_values(
-                result_investors.iter().map(|v| {
-                    (group_name, v.broker_id.as_str(), v.investor_id.as_str())
-                }),
+                group.investors
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .map(|v| {
+                        (group_name, v.broker_id.as_str(), v.investor_id.as_str())
+                    }),
                 |mut b, values| {
                     b.push_bind(values.0)
                         .push_bind(values.1)
@@ -472,8 +486,6 @@ ORDER BY broker_id, investor_id;"#
             ).build()
                 .execute(&self.pool)
                 .await?;
-
-            group.investors = result_investors;
         }
 
         Ok(group)
@@ -766,7 +778,7 @@ mod test {
                 investor_desc: Default::default(),
                 created_at: None,
                 deleted_at: None,
-                groups: vec![],
+                groups: None,
             }],
         )).unwrap();
 
