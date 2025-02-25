@@ -118,8 +118,10 @@ function investorsCommit() {
   meta.doModifyGroup(
       selectedGroup.value,
       {
-        investors: selectedInvestors.value.map(
+        investors: selectedInvestors.value?.map(
             (v) => meta.getInvestor(v)
+        ).filter(
+            v => !!v
         )
       }
   ).then((group) => {

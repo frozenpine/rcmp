@@ -6,7 +6,7 @@ import dayjs from "dayjs"
 
 import {metaStore} from "../store/meta.ts";
 import GroupEditor from "../components/GroupEditor.vue"
-import {useMessage, useNotification} from "../utils/feedback.ts"
+import {useNotification} from "../utils/feedback.ts"
 
 interface SelectProps {
   loading?: boolean;
@@ -19,7 +19,6 @@ const {
 } = defineProps<SelectProps>();
 
 const meta = metaStore();
-const message = useMessage();
 const notification = useNotification();
 
 const selected = defineModel<string | string[] | undefined>("selected");
@@ -28,7 +27,7 @@ const investorLoading = ref(false);
 
 function loadGroupInvestors(force: boolean=false) {
   investorLoading.value = true;
-  meta.doQueryInvestors(true, {force: force})
+  meta.doQueryInvestors({force: force})
       .then((investors) => {
         const group_investors = meta.groupInvestors;
         notification.info({
@@ -43,7 +42,7 @@ function loadGroupInvestors(force: boolean=false) {
               },
             ),
           meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-          duration: 10000,
+          duration: 5000,
         })
       }).catch((err) => {
         console.error("query investors failed:", err);
@@ -106,7 +105,4 @@ const selectOptions = computed(() => {
 </template>
 
 <style scoped>
-.group-editor {
-  width: 320px;
-}
 </style>

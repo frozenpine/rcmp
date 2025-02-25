@@ -12,6 +12,7 @@ import Feedback from "./components/Feedback.vue"
 import AccountTable from "./components/AccountTable.vue"
 import TUAccountSinker from "./components/TUAccountSinker.vue"
 import InvestorSelector from "./components/InvestorSelector.vue"
+import type {InvestorSelectorInst} from "./components/interface";
 
 import { fundStore } from "./store/fund.ts";
 
@@ -20,7 +21,7 @@ const fund = fundStore();
 const osTheme = useOsTheme();
 
 const accountLoading = ref(false);
-const investorSelectorRef = ref(undefined);
+const investorSelectorRef = ref<InvestorSelectorInst>();
 const selectedInvestor = ref<string>("");
 
 const selectedInvestorAccounts = computed(() => {
@@ -48,7 +49,7 @@ onMounted(() => {
     <n-notification-provider><Feedback :notification="true" /></n-notification-provider>
     <n-space vertical class="container">
       <n-space align="center" justify="center">
-        <n-card title="Welcome to RCMP" size="huge" hoverable >
+        <n-card title="Welcome to RCMP" size="huge" class="card" hoverable >
           <template #header-extra>
             <TUAccountSinker />
           </template>
@@ -83,7 +84,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.n-card {
+.card {
   min-width: 400px;
   background: transparent;
 }

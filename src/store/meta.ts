@@ -51,9 +51,11 @@ export const metaStore = defineStore("meta", {
     },
     actions: {
         async doQueryInvestors(
-            all: boolean, {
+            {
+                all = true,
                 force = false,
             }: {
+                all?: boolean,
                 force?: boolean
             } = {},
         ): Promise<Array<DBInvestor>> {
