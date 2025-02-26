@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import {type DataTableColumns, type DataTableInst, NDataTable, NDropdown, NWatermark} from "naive-ui";
+import {
+  type DataTableColumns, type DataTableInst,
+  type DataTableCreateSummary, type SummaryRowData,
+  NDataTable, NDropdown, NWatermark, NFlex,
+} from "naive-ui";
 import {h, nextTick, ref, computed} from "vue";
 import dayjs from "dayjs";
 
@@ -160,6 +164,55 @@ const rowProps = (_: DBAccount) => {
   }
 }
 
+const createSummary: DataTableCreateSummary<DBAccount> = (pageData): SummaryRowData | SummaryRowData[] => {
+  if (!pageData || pageData.length < 1) return undefined
+
+  if (latest) {
+    return {
+      'account_id': {
+        value: h(NFlex, {justify: "end"}, "汇总:"),
+        colSpan: 3,
+      },
+      'pre_balance': {
+        value: h('span', {}, CNY(pageData.reduce(
+            (pre, row) => pre + row.pre_balance,
+            0,
+        ))),
+      },
+      'balance': {
+        value: h('span', {}, CNY(pageData.reduce(
+            (pre, row) => pre + row.balance,
+            0,
+        ))),
+      },
+      'position_profit': {
+        value: h('span', {}, CNY(pageData.reduce(
+            (pre, row) => pre + row.position_profit,
+            0,
+        ))),
+      },
+      'close_profit': {
+        value: h('span', {}, CNY(pageData.reduce(
+            (pre, row) => pre + row.close_profit,
+            0,
+        ))),
+      },
+      'fee': {
+        value: h('span', {}, CNY(pageData.reduce(
+            (pre, row) => pre + row.fee,
+            0,
+        ))),
+      },
+      'net_profit': {
+        value: h('span', {}, CNY(pageData.reduce(
+            (pre, row) => pre + row.net_profit,
+            0,
+        ))),
+      },
+    };
+  }
+}
+
 </script>
 
 <template>
@@ -174,6 +227,7 @@ const rowProps = (_: DBAccount) => {
                cross selectable>
     <n-data-table ref="dt" :columns="defaultColumns" :data="groupedData" :loading="loading"
                   :row-key="getRowKey" :row-props="rowProps"
+                  :summary="createSummary"
                   striped ></n-data-table>
   </n-watermark>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"

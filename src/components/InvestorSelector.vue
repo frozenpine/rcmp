@@ -72,6 +72,7 @@ const selectOptions = computed(() => {
     return {
       label: g.group_name,
       key: g.group_name,
+      group: g,
       children: g.investors?.map((v) => {
         return {
           label: `${v.investor_name} (${v.investor_id})`,
