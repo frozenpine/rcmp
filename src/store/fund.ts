@@ -88,6 +88,8 @@ export const fundStore = defineStore("fund", {
                 } else {
                     console.log("query account from database:", broker_id, account_id);
 
+                    this.accounts.delete([broker_id, account_id].join("."))
+
                     invoke("query_accounts", {
                         accounts: [account_id],
                         startDate: startDate,
@@ -142,6 +144,10 @@ export const fundStore = defineStore("fund", {
                     console.log("query group hit data cache:", group_name, exist_accounts);
                 } else if (query_accounts.size > 0) {
                     console.log("query group from database:", group_name, query_accounts);
+
+                    query_accounts.forEach((k) => {
+                        this.accounts.delete(k)
+                    })
 
                     invoke("query_accounts", {
                         accounts: [...query_accounts].map((v) => {

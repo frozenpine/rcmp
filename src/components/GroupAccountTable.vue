@@ -32,6 +32,7 @@ const CNY = CurrencyFormatter();
 const message = useMessage();
 
 const {lastDate} = storeToRefs(fund);
+const exportLatest = ref(true);
 
 const defaultColumns: DataTableColumns<DBAccount> = [
   {title: "资金账号", key: "account_id", fixed: "left", width: 100, titleAlign: "center"},
@@ -98,9 +99,9 @@ const groupedData = computed(() => {
 
     const groups = new Set(investor!.groups?.map(v => v.group_name));
 
-    if (groups.size === 0 || !groups.has(group_name)) return false;
+    if (groups.size === 0 || !groups.has(group_name || "")) return false;
 
-    return latest ? v.trading_day === lastDate.value.format("YYYYMMDD") : true
+    return (latest? latest && exportLatest.value : latest || exportLatest.value) ? v.trading_day === lastDate.value.format("YYYYMMDD") : true
   });
 })
 
@@ -119,9 +120,20 @@ function handleMenuSelect(sel: string) {
 
   switch (sel) {
     case "all": {
+      exportLatest.value = false;
       nextTick().then(()=>{
         dt.value?.downloadCsv({
           fileName: `account_all_${now}.csv`,
+        });
+        exportLatest.value = true;
+      })
+      break;
+    }
+    case "latest": {
+      exportLatest.value = true;
+      nextTick().then(()=>{
+        dt.value?.downloadCsv({
+          fileName: `account_latest_${now}.csv`,
         });
       })
       break;
@@ -166,7 +178,7 @@ const rowProps = (_: DBAccount) => {
   </n-watermark>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
               :on-clickoutside="() => contextMenu.show = false" @select="handleMenuSelect"
-              :options="[{label: '导出全部', key: 'all'}]"></n-dropdown>
+              :options="[{label: '导出最新', key: 'latest'}, {label: '导出全部', key: 'all'}, ]"></n-dropdown>
 </template>
 
 <style scoped>

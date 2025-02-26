@@ -186,7 +186,7 @@ const rowProps = (_: DBAccount) => {
   </n-watermark>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
               :on-clickoutside="() => contextMenu.show = false" @select="handleMenuSelect"
-              :options="[{label: '导出全部', key: 'all'}, {label: '导出当前', key: 'page'}]"></n-dropdown>
+              :options="[{label: '导出全部', key: 'all'}, {label: '导出当前', key: 'page'}, ]"></n-dropdown>
 </template>
 
 <style scoped>
