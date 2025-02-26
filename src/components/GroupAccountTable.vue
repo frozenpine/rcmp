@@ -1,44 +1,60 @@
 <script setup lang="ts">
 import {
   type DataTableColumns, type DataTableInst,
-  type DataTableCreateSummary, type SummaryRowData,
+  type DataTableCreateSummary,
   NDataTable, NDropdown, NWatermark, NFlex,
 } from "naive-ui";
-import {h, nextTick, ref, computed} from "vue";
+import type {SummaryRowData} from "naive-ui/es/data-table/src/interface";
+import {h, nextTick, ref, computed, reactive} from "vue";
 import dayjs from "dayjs";
 
 import {CurrencyFormatter} from "../utils/formatter.ts";
 import {useMessage} from "../utils/feedback.ts";
 import {DBAccount} from "../models/db.ts";
-import {fundStore} from "../store/fund.ts";
-import {metaStore} from "../store/meta.ts";
-import {storeToRefs} from "pinia";
+// import {fundStore} from "../store/fund.ts";
+// import {storeToRefs} from "pinia";
 
 interface GroupAccountTableProps {
-  group_name?: string;
   loading?: boolean;
-  latest?: boolean;
   data?: DBAccount[];
   watermark?: string;
 }
 
 const {
-  group_name,
   loading = false,
-  latest = false,
   data,
   watermark = "瑞达期货",
 } = defineProps<GroupAccountTableProps>();
 
-const fund = fundStore();
-const meta = metaStore();
+// const fund = fundStore();
+// const meta = metaStore();
 const CNY = CurrencyFormatter();
 const message = useMessage();
 
-const {lastDate} = storeToRefs(fund);
-const exportLatest = ref(true);
+// const {lastDate} = storeToRefs(fund);
+const exportAll = ref(false);
 
-const defaultColumns: DataTableColumns<DBAccount> = [
+interface RowData extends DBAccount {
+  group?: DBAccount[];
+}
+
+class AccountProxy {
+  private readonly _inner: DBAccount;
+  readonly group: DBAccount[];
+
+  constructor(inner: DBAccount) {
+    this._inner = inner;
+    this.group = [];
+
+    for (const key in inner) {
+      Object.defineProperty(this, key, {
+        get() {return this._inner[key];}
+      })
+    }
+  }
+}
+
+const defaultColumns: DataTableColumns<RowData> = [
   {title: "资金账号", key: "account_id", fixed: "left", width: 100, titleAlign: "center"},
   {title: "账号名称", key: "account_name", fixed: "left", width: 100, titleAlign: "center"},
   {title: "交易日", key: "trading_day", fixed: "left", width: 100, titleAlign: "center"},
@@ -93,64 +109,12 @@ const defaultColumns: DataTableColumns<DBAccount> = [
   {title: "币种", key: "currency_id", fixed: "right", width: 60, titleAlign: "center", align: "right"},
 ]
 
-const groupedData = computed(() => {
-  if (!data || data.length < 1) return [];
-
-  return data.filter((v) => {
-    const investor = meta.getInvestor(v.account_id, v.broker_id);
-
-    if (!investor) return false;
-
-    const groups = new Set(investor!.groups?.map(v => v.group_name));
-
-    if (groups.size === 0 || !groups.has(group_name || "")) return false;
-
-    return (latest? latest && exportLatest.value : latest || exportLatest.value) ? v.trading_day === lastDate.value.format("YYYYMMDD") : true
-  });
-})
-
-const dt = ref<DataTableInst>();
-const contextMenu = ref<{x: number; y: number; show: boolean}>({x: 0, y: 0, show: false});
-
 const getRowKey = (row: any): string => {
-  const data = row as DBAccount;
+  const data = row as RowData;
   return [data.trading_day, data.broker_id, data.account_id, data.currency_id].join(".")
 }
 
-function handleMenuSelect(sel: string) {
-  contextMenu.value.show = false;
-
-  const now = dayjs().format("YYYYMMDDHHmmss");
-
-  switch (sel) {
-    case "all": {
-      exportLatest.value = false;
-      nextTick().then(()=>{
-        dt.value?.downloadCsv({
-          fileName: `account_all_${now}.csv`,
-        });
-        exportLatest.value = true;
-      })
-      break;
-    }
-    case "latest": {
-      exportLatest.value = true;
-      nextTick().then(()=>{
-        dt.value?.downloadCsv({
-          fileName: `account_latest_${now}.csv`,
-        });
-      })
-      break;
-    }
-    default: {
-      console.error("unsupported menu item:", sel);
-      message.error(`尚未支持【${sel}】该菜单选项`);
-      break;
-    }
-  }
-}
-
-const rowProps = (_: DBAccount) => {
+const rowProps = (_: RowData) => {
   return {
     onContextmenu: (e: MouseEvent) => {
       e.preventDefault()
@@ -164,13 +128,93 @@ const rowProps = (_: DBAccount) => {
   }
 }
 
-const createSummary: DataTableCreateSummary<DBAccount> = (pageData): SummaryRowData | SummaryRowData[] => {
-  if (!pageData || pageData.length < 1) return undefined
+const expandPagination = reactive({
+  pageSizes: [5, 10, 15],
+  showSizePicker: true
+})
 
-  if (latest) {
+const expandCol: DataTableColumns<RowData> = [
+  {
+    type: "expand",
+    // expandable: row => row.group && row.group.length > 0,
+    renderExpand: row => {
+      return h(NDataTable, {
+        columns: defaultColumns,
+        rowKey: getRowKey,
+        striped: true,
+        data: row.group?.slice(1),
+        pagination: expandPagination,
+        virtualScroll: true,
+      });
+    }
+  },
+]
+
+const groupedData = computed(() => {
+  if (!data || data.length < 1) return [];
+
+  if (!exportAll.value) {
+    return [...data.reduce(
+        (result: Map<string, AccountProxy>, curr: DBAccount) => {
+          const idt = [curr.broker_id, curr.account_id].join(".");
+
+          let data = result.get(idt);
+
+          if (!data) {
+            data = new AccountProxy(curr);
+          }
+          data.group.push(curr);
+
+          result.set(idt, data);
+
+          return result;
+        },
+        new Map([]),
+    ).values()];
+  } else {
+    return data;
+  }
+})
+
+const dt = ref<DataTableInst>();
+const contextMenu = ref<{x: number; y: number; show: boolean}>({x: 0, y: 0, show: false});
+
+function handleMenuSelect(sel: string) {
+  contextMenu.value.show = false;
+
+  const now = dayjs().format("YYYYMMDDHHmmss");
+
+  switch (sel) {
+    case "all": {
+      exportAll.value = true;
+      nextTick().then(()=>{
+        dt.value?.downloadCsv({
+          fileName: `account_all_${now}.csv`,
+        });
+        exportAll.value = false;
+      })
+      break;
+    }
+    case "page": {
+      nextTick().then(()=>{
+        dt.value?.downloadCsv({
+          fileName: `account_current_${now}.csv`,
+        });
+      })
+      break;
+    }
+    default: {
+      console.error("unsupported menu item:", sel);
+      message.error(`尚未支持【${sel}】该菜单选项`);
+      break;
+    }
+  }
+}
+
+const createSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData | SummaryRowData[] => {
     return {
       'account_id': {
-        value: h(NFlex, {justify: "end"}, "汇总:"),
+        value: h(NFlex, {justify: "end"}, {default: ()=> "汇总："}),
         colSpan: 3,
       },
       'pre_balance': {
@@ -210,7 +254,6 @@ const createSummary: DataTableCreateSummary<DBAccount> = (pageData): SummaryRowD
         ))),
       },
     };
-  }
 }
 
 </script>
@@ -225,14 +268,14 @@ const createSummary: DataTableCreateSummary<DBAccount> = (pageData): SummaryRowD
                :y-offset="28"
                :rotate="-15"
                cross selectable>
-    <n-data-table ref="dt" :columns="defaultColumns" :data="groupedData" :loading="loading"
+    <n-data-table ref="dt" :columns="expandCol.concat(defaultColumns)" :data="groupedData" :loading="loading"
                   :row-key="getRowKey" :row-props="rowProps"
-                  :summary="createSummary"
+                  :summary="groupedData && groupedData.length > 0? createSummary : undefined"
                   striped ></n-data-table>
   </n-watermark>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
               :on-clickoutside="() => contextMenu.show = false" @select="handleMenuSelect"
-              :options="[{label: '导出最新', key: 'latest'}, {label: '导出全部', key: 'all'}, ]"></n-dropdown>
+              :options="[{label: '导出当前', key: 'page'}, {label: '导出全部', key: 'all'}, ]"></n-dropdown>
 </template>
 
 <style scoped>

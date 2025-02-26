@@ -3,7 +3,7 @@ import {ref, onMounted, computed} from "vue";
 import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop, NNotificationProvider,
-  NSpace, NButton, NIcon, NPopover, NH1, NText, NSwitch,
+  NSpace, NButton, NIcon, NPopover, NH1, NText, /*NSwitch,*/
   NForm, NFormItem, NStatistic, NPageHeader,
 } from "naive-ui";
 import { Search, ArrowBigUpLine, InfoCircle, CalendarStats } from "@vicons/tabler"
@@ -11,16 +11,16 @@ import {UserAlt} from "@vicons/fa";
 import {ContactCardGroup16Filled} from "@vicons/fluent"
 
 import Feedback from "./components/Feedback.vue"
-import AccountTable from "./components/AccountTable.vue"
+// import AccountTable from "./components/AccountTable.vue"
 import GroupAccountTable from "./components/GroupAccountTable.vue"
 import TUAccountSinker from "./components/TUAccountSinker.vue"
-import InvestorSelector from "./components/InvestorSelector.vue"
+// import InvestorSelector from "./components/InvestorSelector.vue"
+import GroupSelector from "./components/GroupSelector.vue";
 import type {InvestorLoaderInst} from "./components/interface";
 
 import { fundStore } from "./store/fund.ts";
 import { metaStore } from "./store/meta.ts";
 import { storeToRefs } from "pinia";
-import GroupSelector from "./components/GroupSelector.vue";
 
 const fund = fundStore();
 const meta = metaStore();
@@ -31,14 +31,14 @@ const osTheme = useOsTheme();
 const accountLoading = ref(false);
 const investorLoaderRef = ref<InvestorLoaderInst>();
 const selected = ref<string>("");
-const isGroup = ref(true);
+// const isGroup = ref(true);
 
 const accountData = computed(() => {
-  if (isGroup.value) {
+  // if (isGroup.value) {
     return fund.getGroupAccounts(selected.value);
-  } else {
-    return fund.getInvestorAccounts(selected.value);
-  }
+  // } else {
+  //   return fund.getInvestorAccounts(selected.value);
+  // }
 })
 
 function queryAccounts(force: boolean = false) {
@@ -46,17 +46,17 @@ function queryAccounts(force: boolean = false) {
 
   accountLoading.value = true;
 
-  if (isGroup.value) {
+  // if (isGroup.value) {
     fund.doQueryGroup(selected.value, {force: force})
         .then(console.log)
         .catch(console.error)
         .finally(() => accountLoading.value = false);
-  } else {
-    fund.doQueryAccounts(selected.value, {force: force})
-        .then(console.log)
-        .catch(console.error)
-        .finally(() => accountLoading.value = false);
-  }
+  // } else {
+  //   fund.doQueryAccounts(selected.value, {force: force})
+  //       .then(console.log)
+  //       .catch(console.error)
+  //       .finally(() => accountLoading.value = false);
+  // }
 }
 
 onMounted(() => {
@@ -112,21 +112,21 @@ onMounted(() => {
       </template>
       <template #footer>
         <n-form class="query" :disabled="accountLoading" inline>
+<!--          <n-form-item>-->
+<!--            <n-switch v-model:value="isGroup" @update:value="()=> selected = ''">-->
+<!--              <template #checked-icon>-->
+<!--                <n-icon><ContactCardGroup16Filled/></n-icon>-->
+<!--              </template>-->
+<!--              <template #unchecked-icon>-->
+<!--                <n-icon size="10"><UserAlt/></n-icon>-->
+<!--              </template>-->
+<!--            </n-switch>-->
+<!--          </n-form-item>-->
           <n-form-item>
-            <n-switch v-model:value="isGroup" @update:value="()=> selected = ''">
-              <template #checked-icon>
-                <n-icon><ContactCardGroup16Filled/></n-icon>
-              </template>
-              <template #unchecked-icon>
-                <n-icon size="10"><UserAlt/></n-icon>
-              </template>
-            </n-switch>
-          </n-form-item>
-          <n-form-item>
-            <GroupSelector ref="investorLoaderRef" v-model:selected="selected" v-if="isGroup" />
-            <InvestorSelector ref="investorLoaderRef"
-                              v-model:selected="selected"
-                              @group="g => console.log('investor selected by group:', g)" v-else />
+            <GroupSelector ref="investorLoaderRef" v-model:selected="selected" />
+<!--            <InvestorSelector ref="investorLoaderRef"-->
+<!--                              v-model:selected="selected"-->
+<!--                              @group="g => console.log('investor selected by group:', g)" v-else />-->
           </n-form-item>
           <n-form-item>
             <n-space align="baseline">
@@ -151,9 +151,8 @@ onMounted(() => {
       </template>
     </n-page-header>
     <div class="container">
-      <GroupAccountTable :group_name="selected" :data="accountData"
-                         :loading="accountLoading" latest v-if="isGroup" />
-      <AccountTable :data="accountData" :loading="accountLoading" v-else />
+      <GroupAccountTable :data="accountData" :loading="accountLoading" />
+<!--      <AccountTable :data="accountData" :loading="accountLoading" v-else />-->
     </div>
     <n-back-top :style="{zIndex: 999}"><n-icon size="20"><ArrowBigUpLine/></n-icon></n-back-top>
   </n-config-provider>

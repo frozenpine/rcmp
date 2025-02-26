@@ -8,6 +8,10 @@ import {DBInvestor} from "../models/db.ts";
 import {useMessage} from "../utils/feedback.ts";
 import GroupSelector from "../components/GroupSelector.vue";
 
+const {
+  selected
+} = defineProps<{selected?: string}>()
+
 class InvestorProxy implements TransferOption {
   private _inner: DBInvestor
   investor_name?: string
@@ -16,14 +20,12 @@ class InvestorProxy implements TransferOption {
 
   constructor(inner: DBInvestor) {
     this._inner = inner;
-  }
 
-  get broker_id(): string {
-    return this._inner.broker_id;
-  }
-
-  get investor_id(): string {
-    return this._inner.investor_id;
+    for (const key in inner) {
+      Object.defineProperty(this, key, {
+        get() {return this._inner[key];}
+      })
+    }
   }
 
   get hasName(): boolean {
@@ -45,7 +47,7 @@ class InvestorProxy implements TransferOption {
 
 const meta = metaStore();
 const message = useMessage();
-const selectedGroup = ref<string | undefined>(undefined);
+const selectedGroup = ref<string | undefined>(selected);
 const selectedInvestors = ref<string[] | undefined>(undefined);
 const updating = ref(false);
 

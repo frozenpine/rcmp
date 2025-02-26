@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import {NSelect, NSpace} from "naive-ui";
+import {NButton, NButtonGroup, NIcon, NModal, NModalProvider, NSelect, NSpace} from "naive-ui";
 import {computed, h, ref} from "vue";
 
 import {metaStore} from "../store/meta.ts"
 import dayjs from "dayjs";
 import {useNotification} from "../utils/feedback.ts";
+import GroupEditor from "./GroupEditor.vue";
+import {EditNoteFilled, RefreshFilled} from "@vicons/material";
 
 const meta = metaStore();
 const notification = useNotification();
@@ -21,6 +23,7 @@ const {
 
 const selected = defineModel<string | string[] | undefined>("selected");
 const investorLoading = ref(false);
+const showEditor = ref(false);
 
 const groupOptions = computed(() => {
   return meta.groupInvestors.filter(
@@ -69,9 +72,31 @@ defineExpose({
 </script>
 
 <template>
+  <n-modal-provider>
+    <n-modal v-model:show="showEditor" :mask-closable="false" size="large">
+      <GroupEditor :selected="selected" @close="showEditor = false" />
+    </n-modal>
+  </n-modal-provider>
   <n-select :loading="loading || investorLoading" :multiple="multiple"
             v-model:value="selected" :options="groupOptions"
-            size="small" tag filterable clearable></n-select>
+            size="small" tag filterable clearable>
+    <template #action>
+      <n-space justify="end">
+        <n-button-group size="tiny">
+          <n-button @click="loadGroupInvestors(true)" round>
+            <template #icon><RefreshFilled/></template>
+            刷新
+          </n-button>
+          <n-button @click="showEditor = true" round>
+            <template #icon>
+              <n-icon><EditNoteFilled/></n-icon>
+            </template>
+            编辑
+          </n-button>
+        </n-button-group>
+      </n-space>
+    </template>
+  </n-select>
 </template>
 
 <style scoped>
