@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   type DataTableColumns, type DataTableInst,
-  type DataTableCreateSummary,
+  type DataTableCreateSummary, type TableColumn,
   NDataTable, NDropdown, NWatermark, NFlex,
 } from "naive-ui";
 import type {SummaryRowData} from "naive-ui/es/data-table/src/interface";
@@ -57,60 +57,125 @@ class AccountProxy {
   }
 }
 
-const defaultColumns: DataTableColumns<RowData> = [
-  {title: "资金账号", key: "account_id", fixed: "left", width: 100, titleAlign: "center"},
-  {title: "账号名称", key: "account_name", fixed: "left", width: 100, titleAlign: "center"},
-  {title: "交易日", key: "trading_day", fixed: "left", width: 100, titleAlign: "center"},
-  {
+const allColumns: Map<string, TableColumn<RowData>> = new Map([
+  ["broker_id", {title: "经纪商代码", key: "broker_id", titleAlign: "center"}],
+  ["account_id", {title: "资金账号", key: "account_id", fixed: "left", width: 100, titleAlign: "center"}],
+  ["account_name", {title: "账号名称", key: "account_name", fixed: "left", width: 100, titleAlign: "center"}],
+  ["trading_day", {title: "交易日", key: "trading_day", fixed: "left", width: 100, titleAlign: "center"}],
+  ["frozen_balance", {
+    title: "冻结权益", key: "frozen_balance", titleAlign: "center", align: "right",
+    render(row) {return h("label", CNY(row.frozen_balance))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }],
+  ["pre_balance", {
     title: "昨权益", key: "pre_balance", titleAlign: "center", align: "right",
     render(row) {return h("label", CNY(row.pre_balance))},
     ellipsis: {
       tooltip: true
     },
     resizable: true,
-  },
-  {
+  }],
+  ["balance", {
     title: "今权益", key: "balance", titleAlign: "center", align: "right",
     render(row) {return h("label", CNY(row.balance))},
     ellipsis: {
       tooltip: true
     },
     resizable: true,
-  },
-  {
+  }],
+  ["available", {
+    title: "可用", key: "available", titleAlign: "center", align: "right",
+    render(row) {return h("label", CNY(row.available))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }],
+  ["deposit", {
+    title: "入金", key: "deposit", titleAlign: "center", align: "right",
+    render(row) {return h("label", CNY(row.deposit))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }],
+  ["withdraw", {
+    title: "出金", key: "withdraw", titleAlign: "center", align: "right",
+    render(row) {return h("label", CNY(row.withdraw))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }],
+  ["margin", {
+    title: "保证金", key: "margin", titleAlign: "center", align: "right",
+    render(row) {return h("label", CNY(row.margin))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }],
+  ["frozen_margin", {
+    title: "冻结保证金", key: "frozen_margin", titleAlign: "center", align: "right",
+    render(row) {return h("label", CNY(row.frozen_margin))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }],
+  ["position_profit", {
     title: "持仓盈亏", key: "position_profit", titleAlign: "center", align: "right",
     render(row) {return h("label", CNY(row.position_profit))},
     ellipsis: {
       tooltip: true
     },
     resizable: true,
-  },
-  {
+  }],
+  ["close_profit", {
     title: "平仓盈亏", key: "close_profit", titleAlign: "center", align: "right",
     render(row) {return h("label", CNY(row.close_profit))},
     ellipsis: {
       tooltip: true
     },
     resizable: true,
-  },
-  {
+  }],
+  ["fee", {
     title: "手续费", key: "fee", titleAlign: "center", align: "right",
     render(row) {return h("label", CNY(row.fee))},
     ellipsis: {
       tooltip: true
     },
     resizable: true,
-  },
-  {
+  }],
+  ["frozen_fee", {
+    title: "冻结手续费", key: "frozen_fee", titleAlign: "center", align: "right",
+    render(row) {return h("label", CNY(row.frozen_fee))},
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }],
+  ["net_profit", {
     title: "净盈亏", key: "net_profit", titleAlign: "center", align: "right",
     render(row) {return h("label", CNY(row.net_profit))},
     ellipsis: {
       tooltip: true
     },
     resizable: true,
-  },
-  {title: "币种", key: "currency_id", fixed: "right", width: 60, titleAlign: "center", align: "right"},
-]
+  }],
+  ["currency_id", {title: "币种", key: "currency_id", fixed: "right", width: 60, titleAlign: "center", align: "right"}],
+])
+
+const defaultColumns: DataTableColumns<RowData> = [
+    "account_id", "account_name", "trading_day",
+    "pre_balance", "deposit", "withdraw", "balance",
+    "position_profit", "close_profit", "fee", "net_profit", "currency_id"
+].map((key) => {
+  return allColumns.get(key);
+});
 
 const getRowKey = (row: any): string => {
   const data = row as RowData;
@@ -237,6 +302,22 @@ const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): Sum
           }),
           colSpan: 3,
         },
+        "deposit": {
+          value: h('span', {
+            style: {fontColor: "red"},
+          }, CNY(monthData.reduce(
+              (pre, row) => pre + row.deposit,
+              0,
+          ))),
+        },
+        "withdraw": {
+          value: h('span', {
+            style: {fontColor: "green"},
+          }, CNY(monthData.reduce(
+              (pre, row) => pre + row.withdraw,
+              0,
+          ))),
+        },
         'position_profit': {
           value: h('span', {}, CNY(monthData.reduce(
               (pre, row) => pre + row.position_profit,
@@ -288,6 +369,22 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
           value: h(NFlex, {justify: "end"}, {default: ()=> `${month} 月度汇总：`}),
           colSpan: 3,
         },
+        "deposit": {
+          value: h('span', {
+            style: {fontColor: "red"},
+          }, CNY(monthData.reduce(
+              (pre, row) => pre + row.deposit,
+              0,
+          ))),
+        },
+        "withdraw": {
+          value: h('span', {
+            style: {fontColor: "green"},
+          }, CNY(monthData.reduce(
+              (pre, row) => pre + row.withdraw,
+              0,
+          ))),
+        },
         'position_profit': {
           value: h('span', {}, CNY(monthData.reduce(
               (pre, row) => pre + row.position_profit,
@@ -328,6 +425,18 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
       'pre_balance': {
         value: h('span', {class: "summary",}, CNY(pageData.reduce(
             (pre, row) => pre + row.pre_balance,
+            0,
+        ))),
+      },
+      'deposit': {
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + row.deposit,
+            0,
+        ))),
+      },
+      'withdraw': {
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + row.withdraw,
             0,
         ))),
       },
@@ -374,6 +483,24 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
       'pre_balance': {
         value: h('span', {class: "summary",}, CNY(pageData.reduce(
             (pre, row) => pre + row.pre_balance,
+            0,
+        ))),
+      },
+      'deposit': {
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + (row.group || []).reduce(
+                (pre, curr) => pre + curr.deposit,
+                0
+            ),
+            0,
+        ))),
+      },
+      'withdraw': {
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + (row.group || []).reduce(
+                (pre, curr) => pre + curr.withdraw,
+                0
+            ),
             0,
         ))),
       },

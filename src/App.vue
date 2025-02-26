@@ -3,7 +3,7 @@ import {ref, onMounted, computed} from "vue";
 import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop, NNotificationProvider,
-  NSpace, NButton, NIcon, NPopover, NH1, NText,
+  NSpace, NButton, NIcon, NPopover, NH1, NText, NDatePicker,
   NForm, NFormItem, NStatistic, NPageHeader,
 } from "naive-ui";
 import { Search, ArrowBigUpLine, InfoCircle, CalendarStats } from "@vicons/tabler"
@@ -70,7 +70,10 @@ onMounted(() => {
             <template #prefix>
               <n-icon size="20"><CalendarStats/></n-icon>
             </template>
-            <span class="statistics">{{firstDay? firstDay.format('YYYY-MM-DD') : "N/A"}}</span>
+            <n-date-picker type="date" />
+            <template #suffix>
+              <span class="statistics">/ {{firstDay? firstDay.format('YYYY-MM-DD') : "N/A"}}</span>
+            </template>
           </n-statistic>
           <n-statistic label="截止日期">
             <template #prefix>
