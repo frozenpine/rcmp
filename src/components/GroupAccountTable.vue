@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import {
-  type DataTableColumns, type DataTableInst,
+  type DataTableInst,
   type DataTableCreateSummary, type TableColumn,
   NDataTable, NDropdown, NWatermark, NFlex,
+  NFloatButton, NIcon, NCheckbox,
 } from "naive-ui";
 import type {SummaryRowData} from "naive-ui/es/data-table/src/interface";
-import {h, nextTick, ref, computed} from "vue";
+import {h, nextTick, ref, computed, useModel} from "vue";
 import dayjs from "dayjs";
 import {storeToRefs} from "pinia";
+import {TableEdit16Regular, TextColumnOne20Filled} from "@vicons/fluent";
 
 import {CurrencyFormatter} from "../utils/formatter.ts";
 import {useMessage} from "../utils/feedback.ts";
@@ -169,13 +171,92 @@ const allColumns: Map<string, TableColumn<RowData>> = new Map([
   ["currency_id", {title: "币种", key: "currency_id", fixed: "right", width: 60, titleAlign: "center", align: "right"}],
 ])
 
-const defaultColumns: DataTableColumns<RowData> = [
-    "account_id", "account_name", "trading_day",
-    "pre_balance", "deposit", "withdraw", "balance",
-    "position_profit", "close_profit", "fee", "net_profit", "currency_id"
-].map((key) => {
-  return allColumns.get(key);
-});
+const displayedColumns = ref([
+    {
+      key: "broker_id",
+      show: false,
+    }, {
+      key: "account_id",
+      show: true,
+    }, {
+      key: "account_name",
+      show: true,
+    }, {
+      key: "trading_day",
+      show: true,
+    }, {
+      key: "pre_balance",
+      show: true,
+    }, {
+      key: "deposit",
+      show: true,
+    }, {
+      key: "withdraw",
+      show: true,
+    }, {
+      key: "balance",
+      show: true,
+    }, {
+      key: "frozen_balance",
+      show: false,
+    }, {
+      key: "available",
+      show: false,
+    }, {
+      key: "margin",
+      show: false,
+    }, {
+      key: "frozen_margin",
+      show: false,
+    }, {
+      key: "fee",
+      show: true,
+    }, {
+      key: "frozen_fee",
+      show: false,
+    }, {
+      key: "position_profit",
+      show: true,
+    }, {
+      key: "close_profit",
+      show: true,
+    }, {
+      key: "net_profit",
+      show: true,
+    }, {
+      key: "currency_id",
+      show: true,
+    },
+])
+
+const defaultColumns = computed(() => {
+  return displayedColumns.value.filter(
+      (v) => v.show
+  ).map((v) => {
+    return allColumns.get(v.key)
+  });
+})
+
+const headerColumnOptions = computed(() => {
+  return displayedColumns.value.map((v) => {
+    return {
+      type: "render",
+      render: () => h(
+          NCheckbox,
+          {
+            checked: v.show,
+            onUpdateChecked: (b) => v.show = b,
+            style: {
+              padding: "3px 5px",
+            }
+          },
+          {
+            default: () => allColumns.get(v.key).title
+          }
+      )
+    }
+  })
+})
 
 const getRowKey = (row: any): string => {
   const data = row as RowData;
@@ -196,12 +277,12 @@ const rowProps = (_: RowData) => {
   }
 }
 
-const expandCol: DataTableColumns<RowData> = [
+const expandCol = ref([
   {
     type: "expand",
     renderExpand: row => {
       return h(NDataTable, {
-        columns: defaultColumns,
+        columns: defaultColumns.value,
         rowKey: getRowKey,
         striped: true,
         data: row.group,
@@ -214,7 +295,7 @@ const expandCol: DataTableColumns<RowData> = [
       });
     }
   },
-]
+]);
 
 const groupedData = computed(() => {
   if (!data || data.length < 1) return [];
@@ -276,7 +357,6 @@ function handleMenuSelect(sel: string) {
     }
   }
 }
-
 
 const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData[] => {
     const diffMonth = lastDay.value.diff(firstDay.value, "month") + 1;
@@ -561,10 +641,21 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
                :y-offset="28"
                :rotate="-15"
                cross selectable>
+    <n-float-button shape="circle" :style="{zIndex: 999}" :left="15" :top="335" menu-trigger="hover">
+      <n-icon><TableEdit16Regular/></n-icon>
+      <template #menu>
+        <n-dropdown trigger="click" :options="headerColumnOptions">
+          <n-float-button shape="square">
+            <n-icon><TextColumnOne20Filled/></n-icon>
+          </n-float-button>
+        </n-dropdown>
+      </template>
+    </n-float-button>
     <n-data-table ref="dt" :columns="expandCol.concat(defaultColumns)" :data="groupedData" :loading="loading"
                   :row-key="getRowKey" :row-props="rowProps"
                   :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
-                  striped ></n-data-table>
+                  striped >
+    </n-data-table>
   </n-watermark>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
               :on-clickoutside="() => contextMenu.show = false" @select="handleMenuSelect"
