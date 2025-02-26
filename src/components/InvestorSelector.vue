@@ -7,6 +7,7 @@ import dayjs from "dayjs"
 import {metaStore} from "../store/meta.ts";
 import GroupEditor from "../components/GroupEditor.vue"
 import {useNotification} from "../utils/feedback.ts"
+import {DBGroup} from "../models/db.ts";
 
 interface SelectProps {
   loading?: boolean;
@@ -60,6 +61,12 @@ defineExpose({
   loadGroupInvestors,
 });
 
+interface childOptions {
+  label: string;
+  key: string;
+  group: DBGroup;
+}
+
 const selectOptions = computed(() => {
   return meta.groupInvestors.map((g) => {
     return {
@@ -86,7 +93,7 @@ const selectOptions = computed(() => {
   <n-tree-select :loading="loading || investorLoading" v-model:value="selected" :options="selectOptions"
                  :multiple="multiple" check-strategy="child" placeholder="请选择投资者"
                  :override-default-node-click-behavior="({option}) => {return option.children? 'toggleExpand': 'default'}"
-                 :on-update-value="(_, option) => {emit('group', option.group);}"
+                 :on-update-value="(_, option) => {emit('group', (option as childOptions).group);}"
                  clearable filterable cascade virtual-scroll >
     <template #action>
       <n-space justify="end">

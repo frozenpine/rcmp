@@ -1,5 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
+use std::fs;
 use chrono::Local;
 use derivative::Derivative;
 use futures::lock::Mutex;
@@ -133,23 +134,61 @@ pub fn run() {
             let resource_path = app
                 .path()
                 .resolve("config/config.toml", BaseDirectory::Resource)
-                .unwrap();
-            let cfg_file = std::fs::read_to_string(resource_path.clone()).unwrap();
+                .map_err(|e| {
+                    log::error!("failed to resolve config path: {:?}", e);
+                    e
+                })?;
 
-            let mut cfg: Config = toml::from_str(&cfg_file)?;
+            let cfg_file = std::fs::read_to_string(
+                resource_path.clone()
+            ).map_err(|e| {
+                log::error!("read config file failed: {:?}", e);
+                e
+            })?;
 
-            let db = tauri::async_runtime::block_on(db::create_db(
+            let mut cfg: Config = toml::from_str(&cfg_file)
+                .map_err(|e| {
+                    log::error!("parse config failed: {:?}", e);
+                    e
+                })?;
+
+            if !fs::exists(&cfg.data_base)
+                .map_err(|e| {
+                    log::error!("check data dir failed: {:?}", e);
+                    e
+                })?
+            {
+                log::info!("making data base dir: {}", &cfg.data_base);
+
+                fs::create_dir_all(&cfg.data_base)
+                    .map_err(|e| {
+                        log::error!("create data base dir failed: {:?}", e);
+                        e
+                    })?;
+
+                log::info!("create data base dir: {}", &cfg.data_base);
+            }
+
+            let db = match tauri::async_runtime::block_on(db::create_db(
                 &cfg.data_base,
                 &cfg.sql_base,
                 &cfg.schemas
                     .iter()
                     .map(|v| v.as_str())
                     .collect::<Vec<&str>>(),
-            ))?;
+            )) {
+                Ok(db) => db,
+                Err(e) => {
+                    log::error!("create db failed: {:?}", e);
+                    panic!("create db failed");
+                }
+            };
 
             cfg._db = Some(db);
 
             app.manage(Mutex::new(cfg));
+
+            log::info!("app initialized");
 
             Ok(())
         })

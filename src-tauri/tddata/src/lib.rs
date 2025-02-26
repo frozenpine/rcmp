@@ -1,6 +1,5 @@
 pub mod ctp;
 pub mod db;
-pub mod file;
 
 #[cfg(test)]
 mod test {

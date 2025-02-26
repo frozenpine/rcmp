@@ -29,7 +29,7 @@ export const fundStore = defineStore("fund", {
                 const results: DBAccount[] = [];
 
                 investors.forEach((k) => {
-                    results.push(...state.accounts.has(k)? state.accounts.get(k) : []);
+                    results.push(...state.accounts.has(k)? state.accounts.get(k)! : []);
                 })
 
                 return results;
@@ -135,7 +135,7 @@ export const fundStore = defineStore("fund", {
                 const result: DBAccount[] = [];
 
                 exist_accounts.forEach((k) => {
-                    result.push(...this.accounts.get(k))
+                    result.push(...this.accounts.has(k)? this.accounts.get(k)! : [])
                 })
 
                 console.log("query groups:", persistent_accounts, exist_accounts, query_accounts)
