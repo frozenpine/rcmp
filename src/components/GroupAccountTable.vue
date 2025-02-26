@@ -7,12 +7,12 @@ import {
 import type {SummaryRowData} from "naive-ui/es/data-table/src/interface";
 import {h, nextTick, ref, computed, reactive} from "vue";
 import dayjs from "dayjs";
+import {storeToRefs} from "pinia";
 
 import {CurrencyFormatter} from "../utils/formatter.ts";
 import {useMessage} from "../utils/feedback.ts";
 import {DBAccount} from "../models/db.ts";
-// import {fundStore} from "../store/fund.ts";
-// import {storeToRefs} from "pinia";
+import {metaStore} from "../store/meta.ts";
 
 interface GroupAccountTableProps {
   loading?: boolean;
@@ -26,12 +26,11 @@ const {
   watermark = "瑞达期货",
 } = defineProps<GroupAccountTableProps>();
 
-// const fund = fundStore();
-// const meta = metaStore();
+const meta = metaStore();
 const CNY = CurrencyFormatter();
 const message = useMessage();
 
-// const {lastDate} = storeToRefs(fund);
+const {firstDay, lastDay} = storeToRefs(meta);
 const exportAll = ref(false);
 
 interface RowData extends DBAccount {
@@ -51,6 +50,10 @@ class AccountProxy {
         get() {return this._inner[key];}
       })
     }
+  }
+
+  get value(): string {
+    return [this._inner.broker_id, this._inner.account_id].join(".");
   }
 }
 
@@ -136,15 +139,18 @@ const expandPagination = reactive({
 const expandCol: DataTableColumns<RowData> = [
   {
     type: "expand",
-    // expandable: row => row.group && row.group.length > 0,
     renderExpand: row => {
       return h(NDataTable, {
         columns: defaultColumns,
         rowKey: getRowKey,
         striped: true,
-        data: row.group?.slice(1),
-        pagination: expandPagination,
+        data: row.group,
         virtualScroll: true,
+        minRowHeight: 30,
+        maxHeight: 200,
+        summary: investorDurationSummary,
+        summaryPlacement: "top",
+        size: "small",
       });
     }
   },
@@ -211,49 +217,168 @@ function handleMenuSelect(sel: string) {
   }
 }
 
-const createSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData | SummaryRowData[] => {
-    return {
+
+const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData[] => {
+    const diffMonth = lastDay.value.diff(firstDay.value, "month") + 1;
+
+    const monthSummary = new Array<SummaryRowData>(diffMonth);
+
+    for (let idx=0; idx < diffMonth; idx++) {
+      const month = firstDay.value.add(idx, "month").format("YYYYMM");
+
+      const monthData = pageData.filter(
+          (v) => { return v.trading_day.startsWith(month); }
+      );
+
+      console.log("month data:", month, monthData);
+
+      monthSummary[idx] = {
+        'account_id': {
+          value: h(NFlex, {
+            justify: "end",
+            class: "summary",
+          }, {
+            default: ()=> `${month} 月度汇总：`,
+          }),
+          colSpan: 3,
+        },
+        'position_profit': {
+          value: h('span', {}, CNY(monthData.reduce(
+              (pre, row) => pre + row.position_profit,
+              0,
+          ))),
+        },
+        'close_profit': {
+          value: h('span', {}, CNY(monthData.reduce(
+              (pre, row) => pre + row.close_profit,
+              0,
+          ))),
+        },
+        'fee': {
+          value: h('span', {}, CNY(monthData.reduce(
+              (pre, row) => pre + row.fee,
+              0,
+          ))),
+        },
+        'net_profit': {
+          value: h('span', {}, CNY(monthData.reduce(
+              (pre, row) => pre + row.net_profit,
+              0,
+          ))),
+        },
+      }
+    }
+
+    return monthSummary;
+}
+
+const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData | SummaryRowData[] => {
+    const diffMonth = lastDay.value.diff(firstDay.value, "month") + 1;
+
+    const monthSummary = new Array<SummaryRowData>(diffMonth);
+
+    for (let idx = 0; idx < diffMonth; idx++) {
+        const month = firstDay.value.add(idx, "month").format("YYYYMM");
+
+        const monthData = pageData.reduce(
+            (pre, curr) => {
+              return pre.concat(...curr.group?.filter(
+                  (v) => { return v.trading_day.startsWith(month); }
+              ))
+            }, []
+        );
+
+      monthSummary[idx] = {
+        'account_id': {
+          value: h(NFlex, {justify: "end"}, {default: ()=> `${month} 月度汇总：`}),
+          colSpan: 3,
+        },
+        'position_profit': {
+          value: h('span', {}, CNY(monthData.reduce(
+              (pre, row) => pre + row.position_profit,
+              0,
+          ))),
+        },
+        'close_profit': {
+          value: h('span', {}, CNY(monthData.reduce(
+              (pre, row) => pre + row.close_profit,
+              0,
+          ))),
+        },
+        'fee': {
+          value: h('span', {}, CNY(monthData.reduce(
+              (pre, row) => pre + row.fee,
+              0,
+          ))),
+        },
+        'net_profit': {
+          value: h('span', {}, CNY(monthData.reduce(
+              (pre, row) => pre + row.net_profit,
+              0,
+          ))),
+        },
+      }
+    }
+
+    return monthSummary.concat([{
       'account_id': {
-        value: h(NFlex, {justify: "end"}, {default: ()=> "汇总："}),
+        value: h(NFlex, {
+          justify: "end",
+          class: "summary",
+        }, {
+          default: ()=> "最后交易日汇总："
+        }),
         colSpan: 3,
       },
       'pre_balance': {
-        value: h('span', {}, CNY(pageData.reduce(
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
             (pre, row) => pre + row.pre_balance,
             0,
         ))),
       },
       'balance': {
-        value: h('span', {}, CNY(pageData.reduce(
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
             (pre, row) => pre + row.balance,
             0,
         ))),
       },
       'position_profit': {
-        value: h('span', {}, CNY(pageData.reduce(
-            (pre, row) => pre + row.position_profit,
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + row.group?.reduce(
+                (pre, curr) => pre + curr.position_profit,
+                0
+            ),
             0,
         ))),
       },
       'close_profit': {
-        value: h('span', {}, CNY(pageData.reduce(
-            (pre, row) => pre + row.close_profit,
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + row.group.reduce(
+                (pre, curr) => pre + curr.close_profit,
+                0
+            ),
             0,
         ))),
       },
       'fee': {
-        value: h('span', {}, CNY(pageData.reduce(
-            (pre, row) => pre + row.fee,
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + row.group?.reduce(
+                (pre, curr) => pre + curr.fee,
+                0
+            ),
             0,
         ))),
       },
       'net_profit': {
-        value: h('span', {}, CNY(pageData.reduce(
-            (pre, row) => pre + row.net_profit,
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + row.group?.reduce(
+                (pre, curr) => pre + curr.net_profit,
+                0
+            ),
             0,
         ))),
       },
-    };
+    }]);
 }
 
 </script>
@@ -270,7 +395,7 @@ const createSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowDat
                cross selectable>
     <n-data-table ref="dt" :columns="expandCol.concat(defaultColumns)" :data="groupedData" :loading="loading"
                   :row-key="getRowKey" :row-props="rowProps"
-                  :summary="groupedData && groupedData.length > 0? createSummary : undefined"
+                  :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
                   striped ></n-data-table>
   </n-watermark>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
@@ -279,5 +404,7 @@ const createSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowDat
 </template>
 
 <style scoped>
-
+.summary {
+  font-weight: bold;
+}
 </style>

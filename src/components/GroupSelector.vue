@@ -21,7 +21,7 @@ const {
   multiple = false
 } = defineProps<GroupSelectorProps>();
 
-const selected = defineModel<string | string[] | undefined>("selected");
+const selected = defineModel<string | undefined>("selected");
 const investorLoading = ref(false);
 const showEditor = ref(false);
 
@@ -53,7 +53,6 @@ function loadGroupInvestors(force: boolean=false) {
               },
           ),
           meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-          duration: 5000,
         })
       }).catch((err) => {
     console.error("query investors failed:", err);

@@ -101,6 +101,10 @@ pub struct DBInvestor {
     pub investor_id: String,
     pub investor_name: String,
     pub investor_desc: String,
+    #[sqlx(skip)]
+    pub first_day: Option<String>,
+    #[sqlx(skip)]
+    pub last_day: Option<String>,
     pub created_at: Option<chrono::NaiveDateTime>,
     pub deleted_at: Option<chrono::NaiveDateTime>,
     #[sqlx(skip)]
@@ -341,7 +345,8 @@ impl DB {
             r#"WITH investors AS (
     SELECT
         u.broker_id, u.investor_id, u.investor_name, u.investor_desc, u.created_at AS inv_create,
-        g.group_name, g.group_desc, g.created_at AS grp_create
+        g.group_name, g.group_desc, g.created_at AS grp_create,
+        v.first_day, v.last_day
     FROM meta.investor_info u, meta.group_info g
     INNER JOIN meta.investor_group r
     ON 
@@ -349,15 +354,27 @@ impl DB {
         u.investor_id = r.investor_id AND 
         g.group_name = r.group_name AND 
         u.deleted_at IS NULL AND g.deleted_at IS NULL AND r.deleted_at IS NULL
+    INNER JOIN (
+        SELECT
+            g.broker_id,
+            g.account_id,
+            min(trading_day) AS first_day,
+            max(trading_day) AS last_day
+        FROM fund.account g
+        GROUP BY g.broker_id, g.account_id
+    ) v
+    ON u.broker_id = v.broker_id AND u.investor_id = v.account_id
 )
 SELECT * FROM investors
-UNION ALL
-SELECT
-    DISTINCT broker_id, account_id AS investor_id, account_name AS investor_name, '' AS investor_desc, NULL AS inv_create,
-    '' AS group_name, '' AS group_desc, NULL AS grp_create
+UNION ALL SELECT
+    broker_id, account_id AS investor_id, account_name AS investor_name, '' AS investor_desc, NULL AS inv_create,
+    '' AS group_name, '' AS group_desc, NULL AS grp_create,
+    min(trading_day) AS first_day,
+    max(trading_day) AS last_day
 FROM fund.account
 WHERE $1 AND account_id NOT IN (SELECT investor_id FROM investors)
-ORDER BY broker_id, investor_id;"#
+GROUP BY broker_id, account_id
+ORDER BY group_name DESC, broker_id, investor_id;"#
         );
         
         let rows = qry_builder.build()
@@ -381,6 +398,8 @@ ORDER BY broker_id, investor_id;"#
                     investor_id,
                     investor_name: row.get("investor_name"),
                     investor_desc: row.get("investor_desc"),
+                    first_day: row.get("first_day"),
+                    last_day: row.get("last_day"),
                     created_at: row.get("inv_create"),
                     deleted_at: None,
                     groups: None,
@@ -788,6 +807,8 @@ mod test {
                 investor_id: "123456".to_string(),
                 investor_name: "test".to_string(),
                 investor_desc: Default::default(),
+                first_day: None,
+                last_day: None,
                 created_at: None,
                 deleted_at: None,
                 groups: None,

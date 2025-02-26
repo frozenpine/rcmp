@@ -3,7 +3,7 @@ import {ref, onMounted, computed} from "vue";
 import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop, NNotificationProvider,
-  NSpace, NButton, NIcon, NPopover, NH1, NText, /*NSwitch,*/
+  NSpace, NButton, NIcon, NPopover, NH1, NText,
   NForm, NFormItem, NStatistic, NPageHeader,
 } from "naive-ui";
 import { Search, ArrowBigUpLine, InfoCircle, CalendarStats } from "@vicons/tabler"
@@ -11,10 +11,8 @@ import {UserAlt} from "@vicons/fa";
 import {ContactCardGroup16Filled} from "@vicons/fluent"
 
 import Feedback from "./components/Feedback.vue"
-// import AccountTable from "./components/AccountTable.vue"
 import GroupAccountTable from "./components/GroupAccountTable.vue"
 import TUAccountSinker from "./components/TUAccountSinker.vue"
-// import InvestorSelector from "./components/InvestorSelector.vue"
 import GroupSelector from "./components/GroupSelector.vue";
 import type {InvestorLoaderInst} from "./components/interface";
 
@@ -24,21 +22,18 @@ import { storeToRefs } from "pinia";
 
 const fund = fundStore();
 const meta = metaStore();
-const {firstDate, lastDate} = storeToRefs(fund);
+const {
+  firstDay, lastDay,
+} = storeToRefs(meta);
 
 const osTheme = useOsTheme();
 
 const accountLoading = ref(false);
 const investorLoaderRef = ref<InvestorLoaderInst>();
 const selected = ref<string>("");
-// const isGroup = ref(true);
 
 const accountData = computed(() => {
-  // if (isGroup.value) {
-    return fund.getGroupAccounts(selected.value);
-  // } else {
-  //   return fund.getInvestorAccounts(selected.value);
-  // }
+  return fund.getGroupAccounts(selected.value);
 })
 
 function queryAccounts(force: boolean = false) {
@@ -46,17 +41,10 @@ function queryAccounts(force: boolean = false) {
 
   accountLoading.value = true;
 
-  // if (isGroup.value) {
-    fund.doQueryGroup(selected.value, {force: force})
-        .then(console.log)
-        .catch(console.error)
-        .finally(() => accountLoading.value = false);
-  // } else {
-  //   fund.doQueryAccounts(selected.value, {force: force})
-  //       .then(console.log)
-  //       .catch(console.error)
-  //       .finally(() => accountLoading.value = false);
-  // }
+  fund.doQueryGroup(selected.value, {force: force})
+      .then(console.log)
+      .catch(console.error)
+      .finally(() => accountLoading.value = false);
 }
 
 onMounted(() => {
@@ -77,24 +65,24 @@ onMounted(() => {
       </template>
       <template #extra><TUAccountSinker /></template>
       <template #default>
-        <n-space v-if="fund.accounts.size > 0" class="container header" justify="space-between">
+        <n-space class="container header" justify="space-between">
           <n-statistic label="起始日期">
             <template #prefix>
               <n-icon size="20"><CalendarStats/></n-icon>
             </template>
-            <span class="statistics">{{firstDate.format('YYYY-MM-DD')}}</span>
+            <span class="statistics">{{firstDay? firstDay.format('YYYY-MM-DD') : "N/A"}}</span>
           </n-statistic>
           <n-statistic label="截止日期">
             <template #prefix>
               <n-icon size="20"><CalendarStats/></n-icon>
             </template>
-            <span class="statistics">{{lastDate.format('YYYY-MM-DD')}}</span>
+            <span class="statistics">{{lastDay? lastDay.format('YYYY-MM-DD') : "N/A"}}</span>
           </n-statistic>
           <n-statistic label="分组数">
             <template #prefix>
               <n-icon size="20"><ContactCardGroup16Filled/></n-icon>
             </template>
-            <span class="statistics">{{meta.groups.size}}</span>
+            <span class="statistics">{{ meta.groupCount }}</span>
             <template #suffix>
               <span class="statistics"> 组</span>
             </template>
@@ -103,7 +91,7 @@ onMounted(() => {
             <template #prefix>
               <n-icon size="20"><UserAlt/></n-icon>
             </template>
-            <span class="statistics">{{meta.investors.size}}</span>
+            <span class="statistics">{{meta.investors? meta.investors.size : 0}}</span>
             <template #suffix>
               <span class="statistics"> 位</span>
             </template>
@@ -112,21 +100,8 @@ onMounted(() => {
       </template>
       <template #footer>
         <n-form class="query" :disabled="accountLoading" inline>
-<!--          <n-form-item>-->
-<!--            <n-switch v-model:value="isGroup" @update:value="()=> selected = ''">-->
-<!--              <template #checked-icon>-->
-<!--                <n-icon><ContactCardGroup16Filled/></n-icon>-->
-<!--              </template>-->
-<!--              <template #unchecked-icon>-->
-<!--                <n-icon size="10"><UserAlt/></n-icon>-->
-<!--              </template>-->
-<!--            </n-switch>-->
-<!--          </n-form-item>-->
           <n-form-item>
             <GroupSelector ref="investorLoaderRef" v-model:selected="selected" />
-<!--            <InvestorSelector ref="investorLoaderRef"-->
-<!--                              v-model:selected="selected"-->
-<!--                              @group="g => console.log('investor selected by group:', g)" v-else />-->
           </n-form-item>
           <n-form-item>
             <n-space align="baseline">
@@ -152,7 +127,6 @@ onMounted(() => {
     </n-page-header>
     <div class="container">
       <GroupAccountTable :data="accountData" :loading="accountLoading" />
-<!--      <AccountTable :data="accountData" :loading="accountLoading" v-else />-->
     </div>
     <n-back-top :style="{zIndex: 999}"><n-icon size="20"><ArrowBigUpLine/></n-icon></n-back-top>
   </n-config-provider>

@@ -11,6 +11,8 @@ export const metaStore = defineStore("meta", {
             investors: new Map([]) as Map<string, DBInvestor>,
             groups: new Map([]) as Map<string, DBGroup>,
             ungrouped: new Map([]) as Map<string, DBInvestor>,
+            firstDay: undefined as unknown as dayjs.Dayjs,
+            lastDay: undefined as unknown as dayjs.Dayjs,
         }
     },
     getters: {
@@ -27,6 +29,15 @@ export const metaStore = defineStore("meta", {
 
                 return state.holidays.get(date.format("YYYY-MM-DD"))
             }
+        },
+        groupCount: (state): number => {
+            return state.groups? state.groups.size : 0
+        },
+        groupedInvestorCount: (state): number => {
+            return state.investors? [...state.investors.values()].reduce(
+                (pre, curr) => { return pre + (curr.groups && curr.groups.length > 0)? 1 : 0 },
+                0
+            ) : 0;
         },
         getGroup: (state) => {
             return (name: string): DBGroup|undefined => {
@@ -76,6 +87,17 @@ export const metaStore = defineStore("meta", {
                         this.ungrouped.clear();
 
                         investors.forEach((v) => {
+                            const first_day = v.first_day? dayjs(v.first_day) : undefined;
+                            const last_day = v.last_day? dayjs(v.last_day) : undefined;
+
+                            if (first_day && (!this.firstDay || first_day!.isBefore(this.firstDay))) {
+                                this.firstDay = first_day;
+                            }
+
+                            if (last_day && (!this.lastDay || last_day!.isAfter(this.lastDay))) {
+                                this.lastDay = last_day;
+                            }
+
                             const idt = [v.broker_id, v.investor_id].join(".");
                             this.investors.set(idt, v);
 
@@ -126,6 +148,11 @@ export const metaStore = defineStore("meta", {
                         const idt = [v.broker_id, v.investor_id].join(".")
                         this.ungrouped.delete(idt);
                     })
+
+                    if (!group.investors || group.investors.length < 1) {
+                        this.groups.delete(group_name);
+                    }
+
                     resolve(group);
                 }).catch(reject);
             })

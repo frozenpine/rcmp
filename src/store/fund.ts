@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
 import { invoke } from "@tauri-apps/api/core";
-import dayjs from "dayjs";
 
 import { DBAccount } from "../models/db.ts"
 import {metaStore} from "./meta.ts"
@@ -9,8 +8,6 @@ export const fundStore = defineStore("fund", {
     state: () => {
         return {
             accounts: new Map([]) as Map<string, DBAccount[]>,
-            firstDate: undefined as unknown as dayjs.Dayjs,
-            lastDate: undefined as unknown as dayjs.Dayjs,
         }
     },
     getters: {
@@ -45,15 +42,6 @@ export const fundStore = defineStore("fund", {
     actions: {
         handlerAccounts(accounts: DBAccount[]) {
             accounts.forEach((v) => {
-                const trading_day = dayjs(v.trading_day);
-
-                if (!this.firstDate || trading_day.isBefore(this.firstDate)) {
-                    this.firstDate = trading_day;
-                }
-                if (!this.lastDate || trading_day.isAfter(this.lastDate)) {
-                    this.lastDate = trading_day;
-                }
-
                 const idt = [v.broker_id, v.account_id].join(".")
 
                 if (!this.accounts.has(idt)) {

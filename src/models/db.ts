@@ -33,6 +33,8 @@ export interface DBInvestor {
     readonly investor_id: string;
     readonly investor_name: string;
     readonly investor_desc: string;
+    readonly first_day?: string;
+    readonly last_day?: string;
     readonly created_at?: Date,
     readonly deleted_at?: Date,
     readonly groups?: DBGroup[],

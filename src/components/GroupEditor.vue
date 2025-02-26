@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import {computed, ref, h, nextTick} from "vue";
-import {NTransfer, NCard, NSpace, NButton, NInput} from "naive-ui";
-import type {TransferOption, TransferRenderTargetLabel } from "naive-ui"
+import {computed, ref, /*h,*/ nextTick} from "vue";
+import {NTransfer, NCard, NSpace, NButton/*, NInput*/} from "naive-ui";
+import type {TransferOption/*, TransferRenderTargetLabel*/ } from "naive-ui"
 
 import {metaStore} from "../store/meta.ts"
 import {DBInvestor} from "../models/db.ts";
@@ -26,10 +26,6 @@ class InvestorProxy implements TransferOption {
         get() {return this._inner[key];}
       })
     }
-  }
-
-  get hasName(): boolean {
-    return this._inner.investor_name != "" && this._inner.investor_name != undefined;
   }
 
   get label(): string {
@@ -74,35 +70,6 @@ const transferOptions = computed(() => {
   return meta.allInvestors.map(v => new InvestorProxy(v));
 })
 
-const targetLabelRender: TransferRenderTargetLabel = function({option}) {
-  const v = (option as any) as InvestorProxy;
-
-  if (v.hasName) {
-    return h(
-        "span",
-        v.label
-    )
-  } else {
-    return h(
-        NSpace,
-        {},
-        {
-          default: ()=>[
-            h(NInput, {
-              placeholder: "请输入名称",
-              size: 'tiny',
-              style: {
-                maxWidth: "110px"
-              },
-              onChange: (name) => v.investor_name = name,
-            }),
-            h("span", v.investor_id)
-          ],
-        },
-    )
-  }
-}
-
 function investorsCommit() {
   if (!selectedGroup.value) {return;}
 
@@ -134,7 +101,6 @@ function investorsCommit() {
     </template>
     <n-transfer v-model:value="selectedInvestors" :options="transferOptions"
                 source-title="投资者账号" :target-title="groupName"
-                :render-target-label="targetLabelRender"
                 :disabled="!selectedGroup"
                 source-filterable target-filterable virtual-scroll>
     </n-transfer>
