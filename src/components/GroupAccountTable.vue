@@ -321,7 +321,53 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
           justify: "end",
           class: "summary",
         }, {
-          default: ()=> "最后交易日汇总："
+          default: ()=> "当前交易日汇总："
+        }),
+        colSpan: 3,
+      },
+      'pre_balance': {
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + row.pre_balance,
+            0,
+        ))),
+      },
+      'balance': {
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + row.balance,
+            0,
+        ))),
+      },
+      'position_profit': {
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + row.position_profit,
+            0,
+        ))),
+      },
+      'close_profit': {
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + row.close_profit,
+            0,
+        ))),
+      },
+      'fee': {
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + row.fee,
+            0,
+        ))),
+      },
+      'net_profit': {
+        value: h('span', {class: "summary",}, CNY(pageData.reduce(
+            (pre, row) => pre + row.net_profit,
+            0,
+        ))),
+      },
+    },{
+      'account_id': {
+        value: h(NFlex, {
+          justify: "end",
+          class: "summary",
+        }, {
+          default: ()=> "截止最后交易日汇总："
         }),
         colSpan: 3,
       },
