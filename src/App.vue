@@ -91,9 +91,9 @@ onMounted(() => {
             <template #prefix>
               <n-icon size="20"><UserAlt/></n-icon>
             </template>
-            <span class="statistics">{{meta.investors? meta.investors.size : 0}}</span>
+            <span class="statistics">{{ meta.groupedInvestorCount }}</span>
             <template #suffix>
-              <span class="statistics"> 位</span>
+              <span class="statistics">/ {{ meta.investors? meta.investors.size : 0}} 位</span>
             </template>
           </n-statistic>
         </n-space>

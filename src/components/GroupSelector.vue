@@ -53,6 +53,7 @@ function loadGroupInvestors(force: boolean=false) {
               },
           ),
           meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+          duration: 3000,
         })
       }).catch((err) => {
     console.error("query investors failed:", err);

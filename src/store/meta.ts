@@ -35,7 +35,7 @@ export const metaStore = defineStore("meta", {
         },
         groupedInvestorCount: (state): number => {
             return state.investors? [...state.investors.values()].reduce(
-                (pre, curr) => { return pre + (curr.groups && curr.groups.length > 0)? 1 : 0 },
+                (pre, curr) => pre + ((curr.groups && curr.groups.length > 0)? 1 : 0),
                 0
             ) : 0;
         },

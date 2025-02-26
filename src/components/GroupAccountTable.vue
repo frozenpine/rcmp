@@ -5,7 +5,7 @@ import {
   NDataTable, NDropdown, NWatermark, NFlex,
 } from "naive-ui";
 import type {SummaryRowData} from "naive-ui/es/data-table/src/interface";
-import {h, nextTick, ref, computed, reactive} from "vue";
+import {h, nextTick, ref, computed} from "vue";
 import dayjs from "dayjs";
 import {storeToRefs} from "pinia";
 
@@ -130,11 +130,6 @@ const rowProps = (_: RowData) => {
     }
   }
 }
-
-const expandPagination = reactive({
-  pageSizes: [5, 10, 15],
-  showSizePicker: true
-})
 
 const expandCol: DataTableColumns<RowData> = [
   {
@@ -280,12 +275,12 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
     for (let idx = 0; idx < diffMonth; idx++) {
         const month = firstDay.value.add(idx, "month").format("YYYYMM");
 
-        const monthData = pageData.reduce(
+        const monthData: DBAccount[] = pageData.reduce(
             (pre, curr) => {
-              return pre.concat(...curr.group?.filter(
+              return pre.concat((curr.group || [] as DBAccount[]).filter(
                   (v) => { return v.trading_day.startsWith(month); }
-              ))
-            }, []
+              ));
+            }, [] as DBAccount[]
         );
 
       monthSummary[idx] = {
@@ -344,7 +339,7 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
       },
       'position_profit': {
         value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.group?.reduce(
+            (pre, row) => pre + (row.group || []).reduce(
                 (pre, curr) => pre + curr.position_profit,
                 0
             ),
@@ -353,7 +348,7 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
       },
       'close_profit': {
         value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.group.reduce(
+            (pre, row) => pre + (row.group || []).reduce(
                 (pre, curr) => pre + curr.close_profit,
                 0
             ),
@@ -362,7 +357,7 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
       },
       'fee': {
         value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.group?.reduce(
+            (pre, row) => pre + (row.group || []).reduce(
                 (pre, curr) => pre + curr.fee,
                 0
             ),
@@ -371,7 +366,7 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
       },
       'net_profit': {
         value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.group?.reduce(
+            (pre, row) => pre + (row.group || []).reduce(
                 (pre, curr) => pre + curr.net_profit,
                 0
             ),
