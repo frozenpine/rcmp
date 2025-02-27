@@ -48,8 +48,7 @@ watch(
         <n-icon size="20"><CalendarStats/></n-icon>
       </template>
       <n-date-picker ref="startPickerRef" type="date" v-model:formatted-value="selectedStart"
-                     @blur="()=> startEdit = false"
-                     v-if="startEdit" />
+                     @blur="()=> startEdit = false" clearable v-if="startEdit" />
       <span class="statistics" v-else>{{selectedStart? selectedStart : firstDate}}</span>
       <template #suffix v-if="!startEdit && selectedStart && selectedStart !== firstDate">
         <span class="statistics">/ {{firstDate}}</span>
@@ -60,8 +59,7 @@ watch(
         <n-icon size="20"><CalendarStats/></n-icon>
       </template>
       <n-date-picker ref="endPickerRef" type="date" v-model:formatted-value="selectedEnd"
-                     @blur="()=> endEdit = false"
-                     v-if="endEdit" />
+                     @blur="()=> endEdit = false" clearable v-if="endEdit" />
       <span class="statistics" v-else>{{selectedEnd? selectedEnd : lastDate}}</span>
       <template #suffix v-if="!endEdit && selectedEnd && selectedEnd !== lastDate">
         <span class="statistics">/ {{lastDate}}</span>

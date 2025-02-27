@@ -225,7 +225,7 @@ const displayedColumns = ref<{key: string, show?: boolean, fixed?: boolean}[]>([
     },
 ])
 
-const defaultColumns = computed<DataTableColumns<RowData>>(() => {
+const defaultColumns = computed(() => {
   return displayedColumns.value.filter(
       (v) => v.fixed || v.show
   ).map((v) => {
@@ -248,7 +248,7 @@ const headerColumnOptions = computed(() => {
             }
           },
           {
-            default: () => dataColumns.get(v.key)!.title
+            default: () => (dataColumns.get(v.key) as any).title
           }
       )
     }
@@ -274,51 +274,50 @@ const rowProps = (_: RowData) => {
   }
 }
 
-const parentColumns = computed<DataTableColumns<RowData>>(()=> {
-    return [
+const parentColumns = computed(() => {
+    return ([
       {
         type: "expand",
-        title(_) {
-          return h(
-              NDropdown,
-              {
-                trigger: "click",
-                placement: "right-start",
-                options: headerColumnOptions.value,
-              },
-              {
-                default: ()=> h(
-                    NButton,
-                    {
-                      text: true,
-                      style: {fontSize: '24px'}
-                    },
-                    {
-                      default: () => h(
-                          NIcon,
-                          {component: TextColumnOne20Filled}
-                      )
-                    }
-                )
-              }
-          )
-        },
-        renderExpand: (row: RowData) => {
-          return h(NDataTable, {
-            columns: defaultColumns.value,
-            rowKey: getRowKey,
-            striped: true,
-            data: row.group,
-            virtualScroll: true,
-            minRowHeight: 30,
-            maxHeight: 200,
-            summary: investorDurationSummary,
-            summaryPlacement: "top",
-            size: "small",
-          });
-        }
+        title: () => h(
+            NDropdown,
+            {
+              trigger: "click",
+              placement: "right-start",
+              options: headerColumnOptions.value,
+            },
+            {
+              default: ()=> h(
+                  NButton,
+                  {
+                    text: true,
+                    style: {fontSize: '24px'}
+                  },
+                  {
+                    default: () => h(
+                        NIcon,
+                        {component: TextColumnOne20Filled}
+                    )
+                  }
+              )
+            }
+        ),
+        renderExpand: (row: RowData) => h(
+            NDataTable,
+            {
+              columns: (defaultColumns.value as DataTableColumns<RowData>),
+              rowKey: getRowKey,
+              striped: true,
+              data: row.group!,
+              virtualScroll: true,
+              minRowHeight: 30,
+              maxHeight: 200,
+              summary: investorDurationSummary,
+              summaryPlacement: "top",
+              size: "small",
+            },
+        )
       },
-    ].concat(defaultColumns.value);
+    ] as DataTableColumns<RowData>).concat(defaultColumns.value as DataTableColumns<RowData>);
 });
 
 const groupedData = computed(() => {
@@ -666,7 +665,7 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
                :y-offset="28"
                :rotate="-15"
                cross selectable>
-    <n-data-table ref="dt" :columns="parentColumns" :data="groupedData" :loading="loading"
+    <n-data-table ref="dt" :columns="parentColumns as DataTableColumns<RowData>" :data="groupedData" :loading="loading"
                   :row-key="getRowKey" :row-props="rowProps"
                   :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
                   striped >
