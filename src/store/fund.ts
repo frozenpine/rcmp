@@ -52,7 +52,7 @@ export const fundStore = defineStore("fund", {
                 this.accounts.get(idt)!.push(v);
             })
         },
-        async doQueryAccounts(
+        async doQueryAccount(
             account_id: string, {
                 broker_id = "5100",
                 startDate,
@@ -81,8 +81,8 @@ export const fundStore = defineStore("fund", {
 
                     invoke("query_accounts", {
                         accounts: [account_id],
-                        startDate: startDate,
-                        endDate: endDate,
+                        startDate: startDate? dayjs(startDate).format("YYYYMMDD") : undefined,
+                        endDate: endDate? dayjs(endDate).format("YYYYMMDD") : undefined,
                     }).then((values) => {
                         this.handlerAccounts(values as DBAccount[]);
                         resolve(values as DBAccount[]);

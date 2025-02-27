@@ -4,7 +4,7 @@ import {NTransfer, NCard, NSpace, NButton/*, NInput*/} from "naive-ui";
 import type {TransferOption/*, TransferRenderTargetLabel*/ } from "naive-ui"
 
 import {metaStore} from "../store/meta.ts"
-import {DBInvestor} from "../models/db.ts";
+import {DBGroup, DBInvestor} from "../models/db.ts";
 import {useMessage} from "../utils/feedback.ts";
 import GroupSelector from "../components/GroupSelector.vue";
 

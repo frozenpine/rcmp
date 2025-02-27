@@ -172,81 +172,79 @@ const displayedColumns = ref<{
   show?: boolean,
   fixed?: boolean,
   sortable: boolean,
-}[]>([
-    {
-      key: "broker_id",
-      show: false,
-      sortable: false,
-    }, {
-      key: "account_id",
-      fixed: true,
-      sortable: false,
-    }, {
-      key: "account_name",
-      fixed: true,
-      sortable: false,
-    }, {
-      key: "trading_day",
-      fixed: true,
-      sortable: false,
-    }, {
-      key: "pre_balance",
-      show: true,
-      sortable: true,
-    }, {
-      key: "deposit",
-      show: true,
-      sortable: true,
-    }, {
-      key: "withdraw",
-      show: true,
-      sortable: true,
-    }, {
-      key: "balance",
-      fixed: true,
-      sortable: true,
-    }, {
-      key: "frozen_balance",
-      show: false,
-      sortable: true,
-    }, {
-      key: "available",
-      show: false,
-      sortable: true,
-    }, {
-      key: "margin",
-      show: false,
-      sortable: true,
-    }, {
-      key: "frozen_margin",
-      show: false,
-      sortable: true,
-    }, {
-      key: "position_profit",
-      fixed: true,
-      sortable: true,
-    }, {
-      key: "close_profit",
-      fixed: true,
-      sortable: true,
-    }, {
-      key: "fee",
-      fixed: true,
-      sortable: true,
-    }, {
-      key: "frozen_fee",
-      show: false,
-      sortable: true,
-    }, {
-      key: "net_profit",
-      fixed: true,
-      sortable: true,
-    }, {
-      key: "currency_id",
-      show: true,
-      sortable: false,
-    },
-])
+}[]>([{
+  key: "broker_id",
+  show: false,
+  sortable: false,
+}, {
+  key: "account_id",
+  fixed: true,
+  sortable: false,
+}, {
+  key: "account_name",
+  fixed: true,
+  sortable: false,
+}, {
+  key: "trading_day",
+  fixed: true,
+  sortable: false,
+}, {
+  key: "pre_balance",
+  show: true,
+  sortable: true,
+}, {
+  key: "deposit",
+  show: true,
+  sortable: true,
+}, {
+  key: "withdraw",
+  show: true,
+  sortable: true,
+}, {
+  key: "balance",
+  fixed: true,
+  sortable: true,
+}, {
+  key: "frozen_balance",
+  show: false,
+  sortable: true,
+}, {
+  key: "available",
+  show: false,
+  sortable: true,
+}, {
+  key: "margin",
+  show: false,
+  sortable: true,
+}, {
+  key: "frozen_margin",
+  show: false,
+  sortable: true,
+}, {
+  key: "position_profit",
+  fixed: true,
+  sortable: true,
+}, {
+  key: "close_profit",
+  fixed: true,
+  sortable: true,
+}, {
+  key: "fee",
+  fixed: true,
+  sortable: true,
+}, {
+  key: "frozen_fee",
+  show: false,
+  sortable: true,
+}, {
+  key: "net_profit",
+  fixed: true,
+  sortable: true,
+}, {
+  key: "currency_id",
+  show: true,
+  sortable: false,
+},]);
 
 const defaultColumns = computed(() => {
   return displayedColumns.value.filter(

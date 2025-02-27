@@ -3,19 +3,22 @@ import {ref, onMounted, computed} from "vue";
 import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop, NNotificationProvider,
-  NSpace, NButton, NIcon, NPopover, NH1, NText,
+  NSpace, NButton, NIcon, NPopover, NH1, NText, NSwitch,
   NForm, NFormItem, NPageHeader,
 } from "naive-ui";
 import { Search, ArrowBigUpLine, InfoCircle, } from "@vicons/tabler"
+import {User, Users} from "@vicons/fa";
 
 import Feedback from "./components/Feedback.vue"
 import GroupAccountTable from "./components/GroupAccountTable.vue"
 import TUAccountSinker from "./components/TUAccountSinker.vue"
 import GroupSelector from "./components/GroupSelector.vue";
+import InvestorSelector from "./components/InvestorSelector.vue";
 import Statistics from "./components/Statistics.vue";
 import type {InvestorLoaderInst} from "./components/interface";
 
 import { fundStore } from "./store/fund.ts";
+import { DBGroup, DBInvestor } from "./models/db.ts";
 
 const fund = fundStore();
 
@@ -23,12 +26,18 @@ const osTheme = useOsTheme();
 
 const accountLoading = ref(false);
 const investorLoaderRef = ref<InvestorLoaderInst>();
-const selected = ref<string>("");
+const isGroup = ref(true);
+const selected = ref<string | undefined>(undefined);
 const selectedStart = ref<string | undefined>(undefined);
 const selectedEnd = ref<string | undefined>(undefined);
 
 const accountData = computed(() => {
-  return fund.getGroupAccounts(selected.value);
+  return isGroup.value? fund.getGroupAccounts(
+      selected.value,
+  ) : fund.getInvestorAccounts(
+      selected.value.split(".")[1],
+      selected.value.split(".")[0],
+  );
 })
 
 function queryAccounts(force: boolean = false) {
@@ -36,18 +45,26 @@ function queryAccounts(force: boolean = false) {
 
   accountLoading.value = true;
 
-  console.log("query accounts:", selected.value, selectedStart.value, selectedEnd.value);
+  console.log("query accounts:", isGroup.value, selected.value, selectedStart.value, selectedEnd.value);
 
-  fund.doQueryGroup(
+  const query = isGroup.value? fund.doQueryGroup(
       selected.value,
       {
         startDate: selectedStart.value,
         endDate: selectedEnd.value,
         force: force
       }
-  ).catch((e) => {
-    console.log("query accounts failed:", e);
-  }).finally(() => accountLoading.value = false);
+  ) : fund.doQueryAccount(
+      selected.value.split(".")[1],
+      {
+        startDate: selectedStart.value,
+        endDate: selectedEnd.value,
+        force: force,
+      }
+  );
+
+  query.catch((e) => console.log("query accounts failed:", e))
+      .finally(() => accountLoading.value = false);
 }
 
 onMounted(() => {
@@ -71,7 +88,18 @@ onMounted(() => {
       <template #footer>
         <n-form class="query" :disabled="accountLoading" inline>
           <n-form-item>
-            <GroupSelector ref="investorLoaderRef" v-model:selected="selected" />
+            <n-switch v-model:value="isGroup" :on-update-value="() => selected = ''">
+              <template #checked-icon>
+                <n-icon><Users/></n-icon>
+              </template>
+              <template #unchecked-icon>
+                <n-icon><User/></n-icon>
+              </template>
+            </n-switch>
+          </n-form-item>
+          <n-form-item>
+            <GroupSelector ref="investorLoaderRef" v-model:selected="selected" v-if="isGroup" />
+            <InvestorSelector ref="investorLoaderRef" v-model:selected="selected" v-else />
           </n-form-item>
           <n-form-item>
             <n-space align="baseline">
@@ -105,9 +133,6 @@ onMounted(() => {
 <style scoped>
 .query {
   justify-content: center;
-}
-.header {
-  margin: 0 30px;
 }
 </style>
 <style>
