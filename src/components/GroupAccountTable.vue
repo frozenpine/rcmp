@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import {
-  type DataTableInst,
-  type DataTableCreateSummary, type TableColumn,
+  type DataTableInst, type DataTableColumns,
+  type DataTableCreateSummary,
   NDataTable, NDropdown, NWatermark, NFlex,
   NFloatButton, NIcon, NCheckbox,
 } from "naive-ui";
-import type {SummaryRowData} from "naive-ui/es/data-table/src/interface";
-import {h, nextTick, ref, computed, useModel} from "vue";
+import type {SummaryRowData, TableColumn} from "naive-ui/es/data-table/src/interface";
+import {h, nextTick, ref, computed} from "vue";
 import dayjs from "dayjs";
 import {storeToRefs} from "pinia";
 import {TableEdit16Regular, TextColumnOne20Filled} from "@vicons/fluent";
@@ -14,7 +14,6 @@ import {TableEdit16Regular, TextColumnOne20Filled} from "@vicons/fluent";
 import {CurrencyFormatter} from "../utils/formatter.ts";
 import {useMessage} from "../utils/feedback.ts";
 import {DBAccount} from "../models/db.ts";
-import {metaStore} from "../store/meta.ts";
 
 interface GroupAccountTableProps {
   loading?: boolean;
@@ -28,11 +27,9 @@ const {
   watermark = "瑞达期货",
 } = defineProps<GroupAccountTableProps>();
 
-const meta = metaStore();
 const CNY = CurrencyFormatter();
 const message = useMessage();
 
-const {firstDay, lastDay} = storeToRefs(meta);
 const exportAll = ref(false);
 
 interface RowData extends DBAccount {
@@ -59,7 +56,7 @@ class AccountProxy {
   }
 }
 
-const allColumns: Map<string, TableColumn<RowData>> = new Map([
+const allColumns = new Map<string, TableColumn<RowData>>([
   ["broker_id", {title: "经纪商代码", key: "broker_id", titleAlign: "center"}],
   ["account_id", {title: "资金账号", key: "account_id", fixed: "left", width: 100, titleAlign: "center"}],
   ["account_name", {title: "账号名称", key: "account_name", fixed: "left", width: 100, titleAlign: "center"}],
@@ -171,19 +168,19 @@ const allColumns: Map<string, TableColumn<RowData>> = new Map([
   ["currency_id", {title: "币种", key: "currency_id", fixed: "right", width: 60, titleAlign: "center", align: "right"}],
 ])
 
-const displayedColumns = ref([
+const displayedColumns = ref<{key: string, show?: boolean, fixed?: boolean}[]>([
     {
       key: "broker_id",
       show: false,
     }, {
       key: "account_id",
-      show: true,
+      fixed: true,
     }, {
       key: "account_name",
-      show: true,
+      fixed: true,
     }, {
       key: "trading_day",
-      show: true,
+      fixed: true,
     }, {
       key: "pre_balance",
       show: true,
@@ -195,7 +192,7 @@ const displayedColumns = ref([
       show: true,
     }, {
       key: "balance",
-      show: true,
+      fixed: true,
     }, {
       key: "frozen_balance",
       show: false,
@@ -210,28 +207,28 @@ const displayedColumns = ref([
       show: false,
     }, {
       key: "fee",
-      show: true,
+      fixed: true,
     }, {
       key: "frozen_fee",
       show: false,
     }, {
       key: "position_profit",
-      show: true,
+      fixed: true,
     }, {
       key: "close_profit",
-      show: true,
+      fixed: true,
     }, {
       key: "net_profit",
-      show: true,
+      fixed: true,
     }, {
       key: "currency_id",
       show: true,
     },
 ])
 
-const defaultColumns = computed(() => {
+const defaultColumns = computed<DataTableColumns<RowData>>(() => {
   return displayedColumns.value.filter(
-      (v) => v.show
+      (v) => v.fixed || v.show
   ).map((v) => {
     return allColumns.get(v.key)
   });
@@ -244,14 +241,15 @@ const headerColumnOptions = computed(() => {
       render: () => h(
           NCheckbox,
           {
-            checked: v.show,
+            checked: v.fixed || v.show,
+            disabled: v.fixed,
             onUpdateChecked: (b) => v.show = b,
             style: {
-              padding: "3px 5px",
+              padding: "3px 15px",
             }
           },
           {
-            default: () => allColumns.get(v.key).title
+            default: () => allColumns.get(v.key)!.title
           }
       )
     }
@@ -277,25 +275,27 @@ const rowProps = (_: RowData) => {
   }
 }
 
-const expandCol = ref([
-  {
-    type: "expand",
-    renderExpand: row => {
-      return h(NDataTable, {
-        columns: defaultColumns.value,
-        rowKey: getRowKey,
-        striped: true,
-        data: row.group,
-        virtualScroll: true,
-        minRowHeight: 30,
-        maxHeight: 200,
-        summary: investorDurationSummary,
-        summaryPlacement: "top",
-        size: "small",
-      });
-    }
-  },
-]);
+const parentColumns = computed<DataTableColumns<RowData>>(()=> {
+    return [
+      {
+        type: "expand",
+        renderExpand: (row: RowData) => {
+          return h(NDataTable, {
+            columns: defaultColumns.value,
+            rowKey: getRowKey,
+            striped: true,
+            data: row.group,
+            virtualScroll: true,
+            minRowHeight: 30,
+            maxHeight: 200,
+            summary: investorDurationSummary,
+            summaryPlacement: "top",
+            size: "small",
+          });
+        }
+      },
+    ].concat(defaultColumns.value);
+});
 
 const groupedData = computed(() => {
   if (!data || data.length < 1) return [];
@@ -359,18 +359,18 @@ function handleMenuSelect(sel: string) {
 }
 
 const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData[] => {
-    const diffMonth = lastDay.value.diff(firstDay.value, "month") + 1;
+    const lastDay = dayjs(pageData[0].trading_day);
+    const firstDay = dayjs(pageData[pageData.length-1].trading_day);
+    const diffMonth = lastDay.diff(firstDay, "month") + 1;
 
     const monthSummary = new Array<SummaryRowData>(diffMonth);
 
     for (let idx=0; idx < diffMonth; idx++) {
-      const month = firstDay.value.add(idx, "month").format("YYYYMM");
+      const month = firstDay.add(idx, "month").format("YYYYMM");
 
       const monthData = pageData.filter(
           (v) => { return v.trading_day.startsWith(month); }
       );
-
-      console.log("month data:", month, monthData);
 
       monthSummary[idx] = {
         'account_id': {
@@ -429,12 +429,14 @@ const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): Sum
 }
 
 const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData | SummaryRowData[] => {
-    const diffMonth = lastDay.value.diff(firstDay.value, "month") + 1;
+    const lastDay = dayjs(pageData[0].trading_day);
+    const firstDay = dayjs(pageData[pageData.length-1].trading_day);
+    const diffMonth = lastDay.diff(firstDay, "month") + 1;
 
     const monthSummary = new Array<SummaryRowData>(diffMonth);
 
     for (let idx = 0; idx < diffMonth; idx++) {
-        const month = firstDay.value.add(idx, "month").format("YYYYMM");
+        const month = firstDay.add(idx, "month").format("YYYYMM");
 
         const monthData: DBAccount[] = pageData.reduce(
             (pre, curr) => {
@@ -444,52 +446,52 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
             }, [] as DBAccount[]
         );
 
-      monthSummary[idx] = {
-        'account_id': {
-          value: h(NFlex, {justify: "end"}, {default: ()=> `${month} 月度汇总：`}),
-          colSpan: 3,
-        },
-        "deposit": {
-          value: h('span', {
-            style: {fontColor: "red"},
-          }, CNY(monthData.reduce(
-              (pre, row) => pre + row.deposit,
-              0,
-          ))),
-        },
-        "withdraw": {
-          value: h('span', {
-            style: {fontColor: "green"},
-          }, CNY(monthData.reduce(
-              (pre, row) => pre + row.withdraw,
-              0,
-          ))),
-        },
-        'position_profit': {
-          value: h('span', {}, CNY(monthData.reduce(
-              (pre, row) => pre + row.position_profit,
-              0,
-          ))),
-        },
-        'close_profit': {
-          value: h('span', {}, CNY(monthData.reduce(
-              (pre, row) => pre + row.close_profit,
-              0,
-          ))),
-        },
-        'fee': {
-          value: h('span', {}, CNY(monthData.reduce(
-              (pre, row) => pre + row.fee,
-              0,
-          ))),
-        },
-        'net_profit': {
-          value: h('span', {}, CNY(monthData.reduce(
-              (pre, row) => pre + row.net_profit,
-              0,
-          ))),
-        },
-      }
+        monthSummary[idx] = {
+          'account_id': {
+            value: h(NFlex, {justify: "end"}, {default: ()=> `${month} 月度汇总：`}),
+            colSpan: 3,
+          },
+          "deposit": {
+            value: h('span', {
+              style: {fontColor: "red"},
+            }, CNY(monthData.reduce(
+                (pre, row) => pre + row.deposit,
+                0,
+            ))),
+          },
+          "withdraw": {
+            value: h('span', {
+              style: {fontColor: "green"},
+            }, CNY(monthData.reduce(
+                (pre, row) => pre + row.withdraw,
+                0,
+            ))),
+          },
+          'position_profit': {
+            value: h('span', {}, CNY(monthData.reduce(
+                (pre, row) => pre + row.position_profit,
+                0,
+            ))),
+          },
+          'close_profit': {
+            value: h('span', {}, CNY(monthData.reduce(
+                (pre, row) => pre + row.close_profit,
+                0,
+            ))),
+          },
+          'fee': {
+            value: h('span', {}, CNY(monthData.reduce(
+                (pre, row) => pre + row.fee,
+                0,
+            ))),
+          },
+          'net_profit': {
+            value: h('span', {}, CNY(monthData.reduce(
+                (pre, row) => pre + row.net_profit,
+                0,
+            ))),
+          },
+        }
     }
 
     return monthSummary.concat([{
@@ -641,21 +643,21 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
                :y-offset="28"
                :rotate="-15"
                cross selectable>
-    <n-float-button shape="circle" :style="{zIndex: 999}" :left="15" :top="335" menu-trigger="hover">
+    <n-data-table ref="dt" :columns="parentColumns" :data="groupedData" :loading="loading"
+                  :row-key="getRowKey" :row-props="rowProps"
+                  :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
+                  striped >
+    </n-data-table>
+    <n-float-button shape="circle" position="relative" :style="{zIndex: 999}" :left="10" :top="-212" menu-trigger="hover">
       <n-icon><TableEdit16Regular/></n-icon>
       <template #menu>
-        <n-dropdown trigger="click" :options="headerColumnOptions">
+        <n-dropdown trigger="click" placement="right-start" :options="headerColumnOptions">
           <n-float-button shape="square">
             <n-icon><TextColumnOne20Filled/></n-icon>
           </n-float-button>
         </n-dropdown>
       </template>
     </n-float-button>
-    <n-data-table ref="dt" :columns="expandCol.concat(defaultColumns)" :data="groupedData" :loading="loading"
-                  :row-key="getRowKey" :row-props="rowProps"
-                  :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
-                  striped >
-    </n-data-table>
   </n-watermark>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
               :on-clickoutside="() => contextMenu.show = false" @select="handleMenuSelect"
