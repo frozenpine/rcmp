@@ -112,7 +112,7 @@ pub struct DBInvestor {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Schema {
+pub struct Schema {
     name: String,
     dsn: String,
 }
