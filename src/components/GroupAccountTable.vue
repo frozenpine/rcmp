@@ -453,11 +453,11 @@ const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): Sum
 
 const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData | SummaryRowData[] => {
     const lastDay = dayjs(
-        pageData[0].group[0].trading_day
+        pageData[0].group![0].trading_day
     );
     const firstDay = dayjs(
         pageData[pageData.length-1]
-            .group[pageData[pageData.length-1].group.length-1]
+            .group![pageData[pageData.length-1].group!.length-1]
             .trading_day
     );
 
