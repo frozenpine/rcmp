@@ -32,11 +32,13 @@ const selectedStart = ref<string | undefined>(undefined);
 const selectedEnd = ref<string | undefined>(undefined);
 
 const accountData = computed(() => {
+  if (!selected.value) return [];
+
   return isGroup.value? fund.getGroupAccounts(
       selected.value,
   ) : fund.getInvestorAccounts(
+      selected.value.split(".")[2],
       selected.value.split(".")[1],
-      selected.value.split(".")[0],
   );
 })
 
@@ -55,8 +57,9 @@ function queryAccounts(force: boolean = false) {
         force: force
       }
   ) : fund.doQueryAccount(
-      selected.value.split(".")[1],
+      selected.value.split(".")[2],
       {
+        broker_id: selected.value.split(".")[1],
         startDate: selectedStart.value,
         endDate: selectedEnd.value,
         force: force,
