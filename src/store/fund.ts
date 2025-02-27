@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { invoke } from "@tauri-apps/api/core";
+import dayjs from "dayjs";
 
 import { DBAccount } from "../models/db.ts"
 import {metaStore} from "./meta.ts"
@@ -126,12 +127,12 @@ export const fundStore = defineStore("fund", {
                     result.push(...this.accounts.has(k)? this.accounts.get(k)! : [])
                 })
 
-                console.log("query groups:", persistent_accounts, exist_accounts, query_accounts)
+                console.log("query groups:", persistent_accounts, exist_accounts, query_accounts, startDate, endDate)
 
                 if (exist_accounts.size > 0) {
                     console.log("query group hit data cache:", group_name, exist_accounts);
                 } else if (query_accounts.size > 0) {
-                    console.log("query group from database:", group_name, query_accounts);
+                    console.log("query group from database:", group_name, query_accounts, startDate, endDate);
 
                     query_accounts.forEach((k) => {
                         this.accounts.delete(k)
@@ -141,9 +142,10 @@ export const fundStore = defineStore("fund", {
                         accounts: [...query_accounts].map((v) => {
                             return v.split(".", 2)[1];
                         }),
-                        startDate: startDate,
-                        endDate: endDate,
+                        startDate: startDate? dayjs(startDate).format("YYYYMMDD") : undefined,
+                        endDate: endDate? dayjs(endDate).format("YYYYMMDD") : undefined,
                     }).then((values) => {
+                        console.log("queried group accounts:", values);
                         this.handlerAccounts(values as DBAccount[]);
 
                         result.push(...(values as DBAccount[]));

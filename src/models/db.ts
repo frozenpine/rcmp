@@ -9,7 +9,7 @@ export interface DBAccount {
     readonly pre_balance: number;
     readonly available: number;
     readonly deposit: number;
-    readonly withdrawal: number;
+    readonly withdraw: number;
     readonly margin: number;
     readonly frozen_margin: number;
     readonly fee: number;

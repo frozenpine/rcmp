@@ -4,33 +4,28 @@ import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop, NNotificationProvider,
   NSpace, NButton, NIcon, NPopover, NH1, NText,
-  NForm, NFormItem, NStatistic, NPageHeader,
+  NForm, NFormItem, NPageHeader,
 } from "naive-ui";
-import { Search, ArrowBigUpLine, InfoCircle, CalendarStats } from "@vicons/tabler"
-import {UserAlt} from "@vicons/fa";
-import {ContactCardGroup16Filled} from "@vicons/fluent"
+import { Search, ArrowBigUpLine, InfoCircle, } from "@vicons/tabler"
 
 import Feedback from "./components/Feedback.vue"
 import GroupAccountTable from "./components/GroupAccountTable.vue"
 import TUAccountSinker from "./components/TUAccountSinker.vue"
 import GroupSelector from "./components/GroupSelector.vue";
+import Statistics from "./components/Statistics.vue";
 import type {InvestorLoaderInst} from "./components/interface";
 
 import { fundStore } from "./store/fund.ts";
-import { metaStore } from "./store/meta.ts";
-import { storeToRefs } from "pinia";
 
 const fund = fundStore();
-const meta = metaStore();
-const {
-  firstDay, lastDay,
-} = storeToRefs(meta);
 
 const osTheme = useOsTheme();
 
 const accountLoading = ref(false);
 const investorLoaderRef = ref<InvestorLoaderInst>();
 const selected = ref<string>("");
+const selectedStart = ref<string | undefined>(undefined);
+const selectedEnd = ref<string | undefined>(undefined);
 
 const accountData = computed(() => {
   return fund.getGroupAccounts(selected.value);
@@ -41,8 +36,16 @@ function queryAccounts(force: boolean = false) {
 
   accountLoading.value = true;
 
-  fund.doQueryGroup(selected.value, {force: force})
-      .then(console.log)
+  console.log("query accounts:", selected.value, selectedStart.value, selectedEnd.value);
+
+  fund.doQueryGroup(
+      selected.value,
+      {
+        startDate: selectedStart.value,
+        endDate: selectedEnd.value,
+        force: force
+      }
+  ).then(console.log)
       .catch(console.error)
       .finally(() => accountLoading.value = false);
 }
@@ -64,40 +67,7 @@ onMounted(() => {
         </n-h1>
       </template>
       <template #extra><TUAccountSinker /></template>
-      <template #default>
-        <n-space class="container header" justify="space-between">
-          <n-statistic label="起始日期">
-            <template #prefix>
-              <n-icon size="20"><CalendarStats/></n-icon>
-            </template>
-            <span class="statistics">{{firstDay? firstDay.format('YYYY-MM-DD') : "N/A"}}</span>
-          </n-statistic>
-          <n-statistic label="截止日期">
-            <template #prefix>
-              <n-icon size="20"><CalendarStats/></n-icon>
-            </template>
-            <span class="statistics">{{lastDay? lastDay.format('YYYY-MM-DD') : "N/A"}}</span>
-          </n-statistic>
-          <n-statistic label="分组数">
-            <template #prefix>
-              <n-icon size="20"><ContactCardGroup16Filled/></n-icon>
-            </template>
-            <span class="statistics">{{ meta.groupCount }}</span>
-            <template #suffix>
-              <span class="statistics"> 组</span>
-            </template>
-          </n-statistic>
-          <n-statistic label="投资者数">
-            <template #prefix>
-              <n-icon size="20"><UserAlt/></n-icon>
-            </template>
-            <span class="statistics">{{ meta.groupedInvestorCount }}</span>
-            <template #suffix>
-              <span class="statistics">/ {{ meta.investors? meta.investors.size : 0}} 位</span>
-            </template>
-          </n-statistic>
-        </n-space>
-      </template>
+      <template #default><Statistics v-model:start="selectedStart" v-model:end="selectedEnd" /></template>
       <template #footer>
         <n-form class="query" :disabled="accountLoading" inline>
           <n-form-item>
@@ -133,9 +103,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.statistics {
-  font-size: 15px;
-}
 .query {
   justify-content: center;
 }

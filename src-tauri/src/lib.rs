@@ -1,4 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+mod ctp;
+mod db;
 
 use std::fs;
 use chrono::Local;
@@ -6,7 +8,7 @@ use derivative::Derivative;
 use futures::lock::Mutex;
 use tauri::path::BaseDirectory;
 use tauri::{Manager, State};
-use tddata::{db, ctp::tu};
+use ctp::tu;
 
 async fn sink_tu_accounts(
     db: &db::DB, accounts: Vec<tu::Account>,
@@ -227,4 +229,66 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod test {
+    use std::env;
+    use super::*;
+
+    #[test]
+    fn test_sink_file() {
+        env_logger::Builder::new()
+            .filter_level(log::LevelFilter::Debug)
+            .target(env_logger::Target::Stdout)
+            .init();
+
+        let p = env::current_dir().unwrap();
+        log::info!("current directory: {}", p.display());
+
+        let accounts = tu::read_account_csv(
+            "../data/查询资金2025-02-06.csv", &[],
+        ).unwrap();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let db = rt.block_on(db::open_db("../data", &["fund"]))
+            .unwrap();
+
+        log::info!("{:?}", &db);
+
+        let row_count = rt.block_on(db.sink_accounts(&accounts, 1000))
+            .unwrap();
+
+        log::info!("row affected: {}", row_count);
+    }
+
+    #[test]
+    fn test_sink_dir() {
+        env_logger::Builder::new()
+            .filter_level(log::LevelFilter::Debug)
+            .target(env_logger::Target::Stdout)
+            .init();
+
+        let accounts = tu::read_account_dir("../data", &[], 1).unwrap();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let db = rt.block_on(db::open_db("../data", &["fund"]))
+            .unwrap();
+
+        log::info!("{:?}", &db);
+
+        let row_count = rt
+            .block_on(db.sink_accounts(&accounts, 1000))
+            .unwrap();
+
+        log::info!("row affected: {}", row_count);
+    }
 }

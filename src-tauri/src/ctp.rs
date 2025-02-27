@@ -1,4 +1,3 @@
-use super::db;
 use std::fmt::Display;
 
 #[derive(Debug, Default, serde::Serialize, Clone)]
@@ -80,9 +79,10 @@ impl Display for PercentValue {
 }
 
 pub mod tu {
-    use super::{db, CurrencyID, PercentValue};
+    use super::{CurrencyID, PercentValue};
     use std::collections::hash_set;
     use std::io::Read;
+    use crate::db;
 
     #[derive(Debug, Default, serde::Deserialize, serde::Serialize, Clone)]
     pub struct Account {
