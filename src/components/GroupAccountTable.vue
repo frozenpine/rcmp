@@ -3,12 +3,12 @@ import {
   type DataTableInst, type DataTableColumns,
   type DataTableCreateSummary,
   NDataTable, NDropdown, NWatermark, NFlex,
-  NButton, NIcon, NCheckbox,
+  NButton, NIcon, NCheckbox, NSpace, NButtonGroup,
 } from "naive-ui";
 import type {SummaryRowData, TableColumn} from "naive-ui/es/data-table/src/interface";
 import {h, nextTick, ref, computed} from "vue";
 import dayjs from "dayjs";
-import {TextColumnOne20Filled} from "@vicons/fluent";
+import {TextColumnOne20Filled, CaretUp16Filled, CaretDown16Filled} from "@vicons/fluent";
 
 import {CurrencyFormatter} from "../utils/formatter.ts";
 import {useMessage} from "../utils/feedback.ts";
@@ -167,61 +167,84 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   ["currency_id", {title: "币种", key: "currency_id", fixed: "right", width: 60, titleAlign: "center", align: "right"}],
 ])
 
-const displayedColumns = ref<{key: string, show?: boolean, fixed?: boolean}[]>([
+const displayedColumns = ref<{
+  key: string,
+  show?: boolean,
+  fixed?: boolean,
+  sortable: boolean,
+}[]>([
     {
       key: "broker_id",
       show: false,
+      sortable: false,
     }, {
       key: "account_id",
       fixed: true,
+      sortable: false,
     }, {
       key: "account_name",
       fixed: true,
+      sortable: false,
     }, {
       key: "trading_day",
       fixed: true,
+      sortable: false,
     }, {
       key: "pre_balance",
       show: true,
+      sortable: true,
     }, {
       key: "deposit",
       show: true,
+      sortable: true,
     }, {
       key: "withdraw",
       show: true,
+      sortable: true,
     }, {
       key: "balance",
       fixed: true,
+      sortable: true,
     }, {
       key: "frozen_balance",
       show: false,
+      sortable: true,
     }, {
       key: "available",
       show: false,
+      sortable: true,
     }, {
       key: "margin",
       show: false,
+      sortable: true,
     }, {
       key: "frozen_margin",
       show: false,
-    }, {
-      key: "fee",
-      fixed: true,
-    }, {
-      key: "frozen_fee",
-      show: false,
+      sortable: true,
     }, {
       key: "position_profit",
       fixed: true,
+      sortable: true,
     }, {
       key: "close_profit",
       fixed: true,
+      sortable: true,
+    }, {
+      key: "fee",
+      fixed: true,
+      sortable: true,
+    }, {
+      key: "frozen_fee",
+      show: false,
+      sortable: true,
     }, {
       key: "net_profit",
       fixed: true,
+      sortable: true,
     }, {
       key: "currency_id",
       show: true,
+      sortable: false,
     },
 ])
 
@@ -233,27 +256,83 @@ const defaultColumns = computed(() => {
   });
 })
 
+const sortUp = (idx) => {
+  if (idx === 0) return;
+
+  const curr = displayedColumns.value[idx];
+  const pre = displayedColumns.value[idx-1];
+
+  if (pre && !pre.sortable) return;
+
+  const pre_chain = displayedColumns.value.slice(0, idx-1);
+  const next_chain = displayedColumns.value.slice(idx+1);
+
+  displayedColumns.value = pre_chain.concat([curr, pre].concat(next_chain));
+}
+
+const sortDown = (idx) => {
+  if (idx === displayedColumns.value.length-1) return;
+
+  const curr = displayedColumns.value[idx];
+  const next = displayedColumns.value[idx+1];
+
+  if (next && !next.sortable) return;
+
+  const pre_chain = displayedColumns.value.slice(0, idx);
+  const next_chain = displayedColumns.value.slice(idx+2)
+
+  displayedColumns.value = pre_chain.concat([next, curr].concat(next_chain));
+}
+
 const headerColumnOptions = computed(() => {
-  return displayedColumns.value.map((v) => {
+  return displayedColumns.value.map((v, idx) => {
     return {
       type: "render",
       render: () => h(
-          NCheckbox,
+          NSpace,
           {
-            checked: v.fixed || v.show,
-            disabled: v.fixed,
-            onUpdateChecked: (b) => v.show = b,
-            style: {
-              padding: "3px 15px",
-            }
+            justify: "space-between"
           },
           {
-            default: () => (dataColumns.get(v.key) as any).title
+            default: () => [
+              h(NCheckbox,
+                  {
+                    checked: v.fixed || v.show,
+                    disabled: v.fixed,
+                    onUpdateChecked: (b) => v.show = b,
+                    style: {padding: "3px 15px"}
+                  },
+                  {default: () => (dataColumns.get(v.key) as any).title}),
+              h(NButtonGroup,
+                  {
+                    size: "tiny",
+                  },
+                  {
+                    default: () => [
+                      h(NButton, {
+                        round: true,
+                        disabled: idx === 0 || !v.sortable || !displayedColumns.value[idx-1].sortable,
+                        focusable: false,
+                        onClick: () => sortUp(idx),
+                      }, {
+                        default: () => h(NIcon, {component: CaretUp16Filled})
+                      }),
+                      h(NButton, {
+                        round: true,
+                        disabled: idx === displayedColumns.value.length - 1 || !v.sortable || !displayedColumns.value[idx+1].sortable,
+                        focusable: false,
+                        onClick: () => sortDown(idx),
+                      }, {
+                        default: () => h(NIcon, {component: CaretDown16Filled})
+                      })
+                    ]
+                  }),
+            ]
           }
       )
     }
   })
-})
+});
 
 const getRowKey = (row: any): string => {
   const data = row as RowData;
@@ -282,7 +361,7 @@ const parentColumns = computed(() => {
             NDropdown,
             {
               trigger: "click",
-              placement: "right-start",
+              placement: "bottom-start",
               options: headerColumnOptions.value,
             },
             {
@@ -396,7 +475,7 @@ const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): Sum
       );
 
       monthSummary[idx] = {
-        'account_id': {
+        "account_id": {
           value: h(NFlex, {
             justify: "end",
             class: "summary",

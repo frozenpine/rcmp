@@ -45,9 +45,9 @@ function queryAccounts(force: boolean = false) {
         endDate: selectedEnd.value,
         force: force
       }
-  ).then(console.log)
-      .catch(console.error)
-      .finally(() => accountLoading.value = false);
+  ).catch((e) => {
+    console.log("query accounts failed:", e);
+  }).finally(() => accountLoading.value = false);
 }
 
 onMounted(() => {

@@ -145,7 +145,6 @@ export const fundStore = defineStore("fund", {
                         startDate: startDate? dayjs(startDate).format("YYYYMMDD") : undefined,
                         endDate: endDate? dayjs(endDate).format("YYYYMMDD") : undefined,
                     }).then((values) => {
-                        console.log("queried group accounts:", values);
                         this.handlerAccounts(values as DBAccount[]);
 
                         result.push(...(values as DBAccount[]));
