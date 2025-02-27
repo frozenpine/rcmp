@@ -3,13 +3,12 @@ import {
   type DataTableInst, type DataTableColumns,
   type DataTableCreateSummary,
   NDataTable, NDropdown, NWatermark, NFlex,
-  NFloatButton, NIcon, NCheckbox,
+  NButton, NIcon, NCheckbox,
 } from "naive-ui";
 import type {SummaryRowData, TableColumn} from "naive-ui/es/data-table/src/interface";
 import {h, nextTick, ref, computed} from "vue";
 import dayjs from "dayjs";
-import {storeToRefs} from "pinia";
-import {TableEdit16Regular, TextColumnOne20Filled} from "@vicons/fluent";
+import {TextColumnOne20Filled} from "@vicons/fluent";
 
 import {CurrencyFormatter} from "../utils/formatter.ts";
 import {useMessage} from "../utils/feedback.ts";
@@ -56,7 +55,7 @@ class AccountProxy {
   }
 }
 
-const allColumns = new Map<string, TableColumn<RowData>>([
+const dataColumns = new Map<string, TableColumn<RowData>>([
   ["broker_id", {title: "经纪商代码", key: "broker_id", titleAlign: "center"}],
   ["account_id", {title: "资金账号", key: "account_id", fixed: "left", width: 100, titleAlign: "center"}],
   ["account_name", {title: "账号名称", key: "account_name", fixed: "left", width: 100, titleAlign: "center"}],
@@ -230,7 +229,7 @@ const defaultColumns = computed<DataTableColumns<RowData>>(() => {
   return displayedColumns.value.filter(
       (v) => v.fixed || v.show
   ).map((v) => {
-    return allColumns.get(v.key)
+    return dataColumns.get(v.key)
   });
 })
 
@@ -249,7 +248,7 @@ const headerColumnOptions = computed(() => {
             }
           },
           {
-            default: () => allColumns.get(v.key)!.title
+            default: () => dataColumns.get(v.key)!.title
           }
       )
     }
@@ -279,6 +278,31 @@ const parentColumns = computed<DataTableColumns<RowData>>(()=> {
     return [
       {
         type: "expand",
+        title(_) {
+          return h(
+              NDropdown,
+              {
+                trigger: "click",
+                placement: "right-start",
+                options: headerColumnOptions.value,
+              },
+              {
+                default: ()=> h(
+                    NButton,
+                    {
+                      text: true,
+                      style: {fontSize: '24px'}
+                    },
+                    {
+                      default: () => h(
+                          NIcon,
+                          {component: TextColumnOne20Filled}
+                      )
+                    }
+                )
+              }
+          )
+        },
         renderExpand: (row: RowData) => {
           return h(NDataTable, {
             columns: defaultColumns.value,
@@ -630,7 +654,6 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
       },
     }]);
 }
-
 </script>
 
 <template>
@@ -648,16 +671,6 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
                   :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
                   striped >
     </n-data-table>
-    <n-float-button shape="circle" position="relative" :style="{zIndex: 999}" :left="10" :top="-212" menu-trigger="hover">
-      <n-icon><TableEdit16Regular/></n-icon>
-      <template #menu>
-        <n-dropdown trigger="click" placement="right-start" :options="headerColumnOptions">
-          <n-float-button shape="square">
-            <n-icon><TextColumnOne20Filled/></n-icon>
-          </n-float-button>
-        </n-dropdown>
-      </template>
-    </n-float-button>
   </n-watermark>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
               :on-clickoutside="() => contextMenu.show = false" @select="handleMenuSelect"
