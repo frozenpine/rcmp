@@ -80,7 +80,6 @@ onMounted(() => {
   investorLoaderRef.value?.loadGroupInvestors();
 
   window.addEventListener("resize", (evt) => {
-    console.log("window size:", evt, evt.target.innerHeight, evt.target.innerWidth);
     windowHeight.value = evt.target.innerHeight;
   })
 })
@@ -90,57 +89,59 @@ onMounted(() => {
   <n-config-provider :theme="osTheme==='dark'? darkTheme : null" :locale="zhCN" :date-locale="dateZhCN">
     <n-message-provider><Feedback :message="true" /></n-message-provider>
     <n-notification-provider><Feedback :notification="true" /></n-notification-provider>
-    <n-page-header subtitle="交易数据分析" class="container">
-      <template #header></template>
-      <template #title>
-        <n-h1 prefix="bar" align-text>
-          <n-text>Welcome to RCMP</n-text>
-        </n-h1>
-      </template>
-      <template #extra><TUAccountSinker /></template>
-      <template #default><Statistics v-model:start="selectedStart" v-model:end="selectedEnd" /></template>
-      <template #footer>
-        <n-form class="query" :disabled="accountLoading" inline>
-          <n-form-item>
-            <n-switch v-model:value="isGroup" :on-update-value="() => selected = ''">
-              <template #checked-icon>
-                <n-icon><Users/></n-icon>
-              </template>
-              <template #unchecked-icon>
-                <n-icon><User/></n-icon>
-              </template>
-            </n-switch>
-          </n-form-item>
-          <n-form-item>
-            <GroupSelector ref="investorLoaderRef" v-model:selected="selected" v-if="isGroup" />
-            <InvestorSelector ref="investorLoaderRef" v-model:selected="selected" v-else />
-          </n-form-item>
-          <n-form-item>
-            <n-space align="baseline">
-              <n-button attr-type="submit" size="small"
-                        @click.exact.stop="queryAccounts(false)"
-                        @click.ctrl.exact.stop="queryAccounts(true)"
-                        :disabled="!selected" type="info" >
-                <template #icon>
-                  <n-icon><Search/></n-icon>
+    <n-scrollbar>
+      <n-page-header subtitle="交易数据分析" class="container">
+        <template #header></template>
+        <template #title>
+          <n-h1 prefix="bar" align-text>
+            <n-text>Welcome to RCMP</n-text>
+          </n-h1>
+        </template>
+        <template #extra><TUAccountSinker /></template>
+        <template #default><Statistics v-model:start="selectedStart" v-model:end="selectedEnd" /></template>
+        <template #footer>
+          <n-form class="query" :disabled="accountLoading" inline>
+            <n-form-item>
+              <n-switch v-model:value="isGroup" :on-update-value="() => selected = ''">
+                <template #checked-icon>
+                  <n-icon><Users/></n-icon>
                 </template>
-                查询
-              </n-button>
-              <n-popover placement="bottom-start">
-                <template #trigger>
-                  <n-icon size="20" :depth="3"><InfoCircle/></n-icon>
+                <template #unchecked-icon>
+                  <n-icon><User/></n-icon>
                 </template>
-                按住Ctrl点击, 强制从数据库刷新
-              </n-popover>
-            </n-space>
-          </n-form-item>
-        </n-form>
-      </template>
-    </n-page-header>
-    <div class="container">
-      <GroupAccountTable :data="accountData" :loading="accountLoading" :max-height="contentHeight" />
-    </div>
-    <n-back-top :style="{zIndex: 999}"><n-icon size="20"><ArrowBigUpLine/></n-icon></n-back-top>
+              </n-switch>
+            </n-form-item>
+            <n-form-item>
+              <GroupSelector ref="investorLoaderRef" v-model:selected="selected" v-if="isGroup" />
+              <InvestorSelector ref="investorLoaderRef" v-model:selected="selected" v-else />
+            </n-form-item>
+            <n-form-item>
+              <n-space align="baseline">
+                <n-button attr-type="submit" size="small"
+                          @click.exact.stop="queryAccounts(false)"
+                          @click.ctrl.exact.stop="queryAccounts(true)"
+                          :disabled="!selected" type="info" >
+                  <template #icon>
+                    <n-icon><Search/></n-icon>
+                  </template>
+                  查询
+                </n-button>
+                <n-popover placement="bottom-start">
+                  <template #trigger>
+                    <n-icon size="20" :depth="3"><InfoCircle/></n-icon>
+                  </template>
+                  按住Ctrl点击, 强制从数据库刷新
+                </n-popover>
+              </n-space>
+            </n-form-item>
+          </n-form>
+        </template>
+      </n-page-header>
+      <div class="container">
+        <GroupAccountTable :data="accountData" :loading="accountLoading" :max-height="contentHeight" />
+      </div>
+      <n-back-top :style="{zIndex: 999}"><n-icon size="20"><ArrowBigUpLine/></n-icon></n-back-top>
+    </n-scrollbar>
   </n-config-provider>
 </template>
 
