@@ -4,7 +4,7 @@ import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop, NNotificationProvider,
   NSpace, NButton, NIcon, NPopover, NH1, NText, NSwitch,
-  NForm, NFormItem, NPageHeader,
+  NForm, NFormItem, NPageHeader, NScrollbar,
 } from "naive-ui";
 import { Search, ArrowBigUpLine, InfoCircle, } from "@vicons/tabler"
 import {User, Users} from "@vicons/fa";
@@ -69,8 +69,20 @@ function queryAccounts(force: boolean = false) {
       .finally(() => accountLoading.value = false);
 }
 
+const windowHeight = ref<number>(600);
+const contentHeight = computed(() => {
+  return windowHeight.value - 370;
+})
+
 onMounted(() => {
+  windowHeight.value = window.innerHeight;
+
   investorLoaderRef.value?.loadGroupInvestors();
+
+  window.addEventListener("resize", (evt) => {
+    console.log("window size:", evt, evt.target.innerHeight, evt.target.innerWidth);
+    windowHeight.value = evt.target.innerHeight;
+  })
 })
 </script>
 
@@ -105,7 +117,7 @@ onMounted(() => {
           </n-form-item>
           <n-form-item>
             <n-space align="baseline">
-              <n-button attr-type="submit"
+              <n-button attr-type="submit" size="small"
                         @click.exact.stop="queryAccounts(false)"
                         @click.ctrl.exact.stop="queryAccounts(true)"
                         :disabled="!selected" type="info" >
@@ -126,7 +138,7 @@ onMounted(() => {
       </template>
     </n-page-header>
     <div class="container">
-      <GroupAccountTable :data="accountData" :loading="accountLoading" />
+      <GroupAccountTable :data="accountData" :loading="accountLoading" :max-height="contentHeight" />
     </div>
     <n-back-top :style="{zIndex: 999}"><n-icon size="20"><ArrowBigUpLine/></n-icon></n-back-top>
   </n-config-provider>

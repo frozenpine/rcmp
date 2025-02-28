@@ -18,12 +18,14 @@ interface GroupAccountTableProps {
   loading?: boolean;
   data?: DBAccount[];
   watermark?: string;
+  maxHeight?: number
 }
 
 const {
   loading = false,
   data,
   watermark = "瑞达期货",
+  maxHeight = 500,
 } = defineProps<GroupAccountTableProps>();
 
 const CNY = CurrencyFormatter();
@@ -789,6 +791,7 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
   </n-watermark>
   <n-data-table ref="dt" :columns="parentColumns as DataTableColumns<RowData>" :data="groupedData" :loading="loading"
                 :row-key="getRowKey" :row-props="rowProps"
+                :max-height="maxHeight"
                 :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
                 striped v-else>
   </n-data-table>

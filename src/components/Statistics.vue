@@ -55,7 +55,7 @@ watch(
                          @blur="()=> startEdit = false" clearable v-if="startEdit" />
           <span class="content" v-else>{{selectedStart? selectedStart : firstDate}}</span>
           <template #suffix>
-            <span class="content" v-if="!startEdit && selectedStart && selectedStart !== firstDate">/ {{firstDate}}</span>
+            <span class="content" v-if="!startEdit && selectedStart && selectedStart !== firstDate"> / {{firstDate}} </span>
             <n-popover placement="bottom-start" v-if="!startEdit">
               <template #trigger>
                 <n-icon size="15"><InfoCircle/></n-icon>
