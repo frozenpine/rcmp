@@ -80,7 +80,7 @@ export const fundStore = defineStore("fund", {
                     this.accounts.delete([broker_id, account_id].join("."))
 
                     invoke("query_accounts", {
-                        accounts: [account_id],
+                        accounts: [[broker_id, account_id]],
                         startDate: startDate? dayjs(startDate).format("YYYYMMDD") : undefined,
                         endDate: endDate? dayjs(endDate).format("YYYYMMDD") : undefined,
                     }).then((values) => {
@@ -140,7 +140,7 @@ export const fundStore = defineStore("fund", {
 
                     invoke("query_accounts", {
                         accounts: [...query_accounts].map((v) => {
-                            return v.split(".", 2)[1];
+                            return v.split(".", 2);
                         }),
                         startDate: startDate? dayjs(startDate).format("YYYYMMDD") : undefined,
                         endDate: endDate? dayjs(endDate).format("YYYYMMDD") : undefined,

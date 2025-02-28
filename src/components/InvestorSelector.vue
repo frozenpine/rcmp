@@ -92,7 +92,7 @@ const selectOptions = computed((): TreeSelectOption[] => {
                  :override-default-node-click-behavior="({option}) => {return option.children? 'toggleExpand': 'default'}"
                  clearable filterable cascade virtual-scroll >
     <template #action>
-      <n-space justify="end">
+      <n-flex justify="end">
         <n-button-group size="tiny">
           <n-button @click="loadGroupInvestors(true)" round>
             <template #icon><RefreshFilled/></template>
@@ -105,7 +105,7 @@ const selectOptions = computed((): TreeSelectOption[] => {
             编辑
           </n-button>
         </n-button-group>
-      </n-space>
+      </n-flex>
     </template>
   </n-tree-select>
 </template>

@@ -95,7 +95,7 @@ async fn sink_tu_account_files(
 
 #[tauri::command]
 async fn query_accounts(
-    accounts: Vec<&str>,
+    accounts: Vec<(&str, &str)>,
     start_date: Option<&str>,
     end_date: Option<&str>,
     state: State<'_, Mutex<Config>>,

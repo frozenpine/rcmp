@@ -247,7 +247,7 @@ impl DB {
 
     pub async fn query_accounts(
         &self,
-        accounts: &[&str],
+        accounts: &[(&str, &str)],
         start_date: Option<&str>,
         end_date: Option<&str>,
     ) -> Result<Vec<DBAccount>, Box<dyn Error>> {
@@ -275,9 +275,10 @@ impl DB {
 
         if !accounts.is_empty() {
             qry_builder
-                .push("account_id IN ")
-                .push_tuples(accounts, |mut b, v| {
-                    b.push_bind(*v);
+                .push("(broker_id, account_id) IN ")
+                .push_tuples(accounts, |mut b, (broker, account)| {
+                    b.push_bind(*broker)
+                        .push_bind(*account);
                 });
         } else {
             qry_builder.push("TRUE");
@@ -790,10 +791,10 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(open_db("../data", &["fund"]))
+        let db = rt.block_on(open_db("./data", &["fund"]))
             .unwrap();
 
-        let result = rt.block_on(db.query_accounts(&["1000008"], None, None))
+        let result = rt.block_on(db.query_accounts(&[("5100", "1000008")], None, None))
             .unwrap();
 
         for v in result {
@@ -801,9 +802,9 @@ mod test {
         }
 
         let result = rt.block_on(db.query_accounts(
-            &["880303", "1000008"],
+            &[("5100", "880303"), ("5100","1000008")],
             Some("20250201"),
-            Some("20250205"),
+            Some("20250206"),
         )).unwrap();
 
         for v in result {
@@ -823,7 +824,7 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(open_db("../data", &["fund", "meta"]))
+        let db = rt.block_on(open_db("./data", &["fund", "meta"]))
             .unwrap();
 
         let result = rt.block_on(db.query_investors(true))
@@ -846,7 +847,7 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(open_db("../data", &["fund", "meta"]))
+        let db = rt.block_on(open_db("./data", &["fund", "meta"]))
             .unwrap();
 
         let g = rt.block_on(db.mod_group_investors(
