@@ -131,6 +131,9 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            let tauri_cfg = app.config();
+
+            log::info!("tauri config: {:?}", tauri_cfg);
             log::info!("using config file: config/config.toml");
 
             let resource_path = app
@@ -141,7 +144,7 @@ pub fn run() {
                     e
                 })?;
 
-            let cfg_file = std::fs::read_to_string(
+            let cfg_file = fs::read_to_string(
                 resource_path.clone()
             ).map_err(|e| {
                 log::error!("read config file failed: {:?}", e);
@@ -171,20 +174,17 @@ pub fn run() {
                 log::info!("create data base dir: {}", &cfg.data_base);
             }
 
-            let db = match tauri::async_runtime::block_on(db::create_db(
-                &cfg.data_base,
-                &cfg.sql_base,
+            let db = tauri::async_runtime::block_on(db::migrate_db(
+                &cfg.data_base, &cfg.sql_base,
+                tauri_cfg.version.clone().unwrap_or_default().as_str(),
                 &cfg.schemas
                     .iter()
                     .map(|v| v.as_str())
                     .collect::<Vec<&str>>(),
-            )) {
-                Ok(db) => db,
-                Err(e) => {
-                    log::error!("create db failed: {:?}", e);
-                    panic!("create db failed");
-                }
-            };
+            )).map_err(|e| {
+                log::error!("migrate db failed: {:?}", e);
+                e
+            }).expect("migrate db failed");
 
             cfg._db = Some(db);
 

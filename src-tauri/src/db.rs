@@ -492,6 +492,10 @@ WHERE group_name = $1 AND (broker_id, investor_id) NOT IN"#
 pub async fn open_db(
     base_dir: &str, schemas: &[&str],
 ) -> Result<DB, Box<dyn Error>> {
+    if base_dir.is_empty() {
+        return Err("open db preflight check failed".into());
+    }
+
     let mut schema_cache = HashMap::with_capacity(schemas.len());
 
     for v in schemas {
@@ -539,14 +543,35 @@ pub async fn open_db(
         .connect("")
         .await?;
 
-    let db = DB { pool };
+    let db = DB {
+        pool
+    };
 
     Ok(db)
+}
+
+async fn get_or_create_conn(db_file_path: &str) -> Result<(sqlx::Pool<sqlx::Sqlite>, bool), sqlx::Error> {
+    let mut exist = true;
+
+    if !sqlx::Sqlite::database_exists(db_file_path).await? {
+        sqlx::Sqlite::create_database(db_file_path).await?;
+        exist = false;
+    }
+
+    Ok((SqlitePoolOptions::new()
+        .min_connections(1)
+        .max_connections(1)
+        .connect(db_file_path)
+        .await?, exist))
 }
 
 pub async fn create_db(
     base_dir: &str, sql_dir: &str, schemas: &[&str],
 ) -> Result<DB, Box<dyn Error>> {
+    if base_dir.is_empty() || sql_dir.is_empty() {
+        return Err("create db preflight check failed".into());
+    }
+
     let mut schema_set = HashSet::with_capacity(schemas.len());
 
     for v in schemas {
@@ -563,16 +588,7 @@ pub async fn create_db(
         let sql_base = PathBuf::from(sql_dir)
             .join(schema);
 
-        let db_file_path = db_path.to_str().unwrap();
-
-        if !sqlx::Sqlite::database_exists(db_file_path).await? {
-            sqlx::Sqlite::create_database(db_file_path).await?;
-        }
-
-        let conn = SqlitePoolOptions::new()
-            .min_connections(1)
-            .max_connections(1)
-            .connect(db_file_path)
+        let (conn, _) = get_or_create_conn(db_path.to_str().unwrap())
             .await?;
 
         let structure_sql_path = sql_base
@@ -638,6 +654,76 @@ pub async fn create_db(
     }
 
     open_db(base_dir, schemas).await
+}
+
+pub async fn migrate_db(
+    base_dir: &str, sql_base: &str, version: &str,
+    schemas: &[&str],
+) -> Result<DB, Box<dyn Error>> {
+    if base_dir.is_empty() | sql_base.is_empty() | version.is_empty() {
+        return Err("migrate db preflight check failed".into());
+    }
+
+    let mut schema_set = HashSet::with_capacity(schemas.len());
+
+    for v in schemas {
+        if !schema_set.insert(*v) {
+            log::warn!("Schema already exists: {}", *v);
+        }
+    }
+
+    for schema in schema_set {
+        let migrate_sql_file = PathBuf::from(sql_base)
+            .join(schema)
+            .join(format!("{}_migrate_{}.sql", schema, version));
+
+        log::info!("check migration: {}, {}, {:?}", schema, version, migrate_sql_file);
+
+        if fs::exists(&migrate_sql_file).unwrap_or(false) {
+            let migrate_done = PathBuf::from(&migrate_sql_file)
+                .with_extension("ok");
+
+            if fs::exists(&migrate_done).unwrap_or(false) {
+                log::info!("migration already done: {:?}, {:?}",
+                        migrate_sql_file, migrate_done);
+                continue;
+            }
+
+            let migrate_sql = fs::read_to_string(&migrate_sql_file)?;
+
+            log::info!("migrate sql found: {:?}", migrate_sql_file);
+
+            let db_path = PathBuf::from(base_dir)
+                .join(schema)
+                .with_extension("db");
+
+            let (conn, exist) = get_or_create_conn(db_path.to_str().unwrap())
+                .await?;
+
+            if !exist {
+                log::info!("db not exist, skip migration: {}, {}", schema, version);
+                continue;
+            }
+
+            match sqlx::query(&migrate_sql).execute(&conn).await {
+                Ok(_) => {
+                    log::info!("migrate successfully executed: {:?}", migrate_sql_file);
+
+                    if fs::File::create(&migrate_done).is_ok() {
+                        log::info!(
+                                "migrate marked done: {:?}, {:?}",
+                                migrate_sql_file, migrate_done
+                            );
+                    }
+                },
+                Err(e) => { return Err(e.into()); },
+            };
+        } else {
+            log::info!("no migration for current schema: {}, {}", schema, version);
+        }
+    }
+
+    create_db(base_dir, sql_base, schemas).await
 }
 
 #[cfg(test)]
