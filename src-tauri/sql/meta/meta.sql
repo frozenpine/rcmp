@@ -62,9 +62,7 @@ CREATE TABLE IF NOT EXISTS "investor_group" (
   "investor_id" text NOT NULL,
   "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "deleted_at" DATETIME,
-  PRIMARY KEY ("group_name", "broker_id", "investor_id"),
-  CONSTRAINT "group_ref" FOREIGN KEY ("group_name") REFERENCES "group_info" ("group_name") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "account_ref" FOREIGN KEY ("broker_id", "investor_id") REFERENCES "investor_info" ("broker_id", "investor_id") ON DELETE CASCADE ON UPDATE CASCADE
+  PRIMARY KEY ("group_name", "broker_id", "investor_id")
 );
 
 -- ----------------------------

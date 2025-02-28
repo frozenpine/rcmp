@@ -104,7 +104,7 @@ async fn query_accounts(
 
     match cfg._db.as_ref() {
         Some(db) => db
-            .query_accounts_range(&accounts, start_date, end_date)
+            .query_accounts(&accounts, start_date, end_date)
             .await
             .map_err(|e| {
                 log::error!("query accounts failed: {:?}", e);

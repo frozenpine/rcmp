@@ -139,10 +139,6 @@ lazy_static! {
 }
 
 impl DB {
-    pub async fn open(base_dir: &str, schemas: &[&str]) -> Result<Self, Box<dyn Error>> {
-        open_db(base_dir, schemas).await
-    }
-
     pub async fn sink_accounts<T: AccountInfo>(
         &self,
         accounts: &[T],
@@ -250,40 +246,6 @@ impl DB {
     }
 
     pub async fn query_accounts(
-        &self,
-        accounts: &[&str],
-    ) -> Result<Vec<DBAccount>, Box<dyn Error>> {
-        if self.is_closed() {
-            return Err("DB is closed".into());
-        }
-
-        log::info!("query accounts data with args: {:?}", accounts);
-
-        let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-            r#"SELECT
-    trading_day, broker_id, account_id, account_name,
-    balance, frozen_balance, pre_balance,
-    available, deposit, withdraw,
-    margin, frozen_margin, fee, frozen_fee,
-    premium, frozen_premium,
-    position_profit, close_profit, net_profit, currency_id
- FROM fund.account WHERE "#,
-        );
-
-        if accounts.is_empty() {
-            qry_builder.push("TRUE");
-        } else {
-            qry_builder
-                .push("account_id IN ")
-                .push_tuples(accounts, |mut b, v| {
-                    b.push_bind(*v);
-                });
-        }
-
-        self.execute_account_qry(qry_builder).await
-    }
-
-    pub async fn query_accounts_range(
         &self,
         accounts: &[&str],
         start_date: Option<&str>,
@@ -488,7 +450,7 @@ ORDER BY group_name DESC, broker_id, investor_id;"#
 
             log::info!("inserting for group investors: {:?}", group.investors);
             sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-                r#"INSERT OR IGNORE INTO meta.investor_group(group_name, broker_id, investor_id) "#
+                r#"INSERT OR REPLACE INTO meta.investor_group(group_name, broker_id, investor_id) "#
             ).push_values(
                 group.investors
                     .as_ref()
@@ -745,14 +707,14 @@ mod test {
         let db = rt.block_on(open_db("../data", &["fund"]))
             .unwrap();
 
-        let result = rt.block_on(db.query_accounts(&["1000008"]))
+        let result = rt.block_on(db.query_accounts(&["1000008"], None, None))
             .unwrap();
 
         for v in result {
             log::info!("{:?}", v);
         }
 
-        let result = rt.block_on(db.query_accounts_range(
+        let result = rt.block_on(db.query_accounts(
             &["880303", "1000008"],
             Some("20250201"),
             Some("20250205"),

@@ -7,7 +7,6 @@ import dayjs from "dayjs"
 import {metaStore} from "../store/meta.ts";
 import GroupEditor from "../components/GroupEditor.vue"
 import {useNotification} from "../utils/feedback.ts"
-import {DBGroup, DBInvestor} from "../models/db.ts";
 
 interface SelectProps {
   loading?: boolean;
