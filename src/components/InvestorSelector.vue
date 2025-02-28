@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import {NTreeSelect, NSpace, NButton, NIcon, NModalProvider, NModal, NButtonGroup} from "naive-ui";
+import {
+  type TreeSelectOption,
+  NTreeSelect, NSpace, NButton, NIcon,
+  NModalProvider, NModal, NButtonGroup,
+} from "naive-ui";
 import {RefreshFilled, EditNoteFilled} from "@vicons/material";
 import {computed, ref, h} from "vue";
 import dayjs from "dayjs"
@@ -61,13 +65,7 @@ defineExpose({
   loadGroupInvestors,
 });
 
-interface SelectOption {
-  label: string,
-  key: string,
-  children?: SelectOption[],
-}
-
-const selectOptions = computed((): SelectOption => {
+const selectOptions = computed((): TreeSelectOption[] => {
   return meta.groupInvestors.map((g) => {
     return {
       label: g.group_name,
@@ -86,7 +84,7 @@ const selectOptions = computed((): SelectOption => {
 <template>
   <n-modal-provider>
     <n-modal v-model:show="showEditor" :mask-closable="false" size="large">
-      <GroupEditor :selected="selected.split('.')[0]" @close="showEditor = false" />
+      <GroupEditor :selected="selected?.split('.')[0]" @close="showEditor = false" />
     </n-modal>
   </n-modal-provider>
   <n-tree-select :loading="loading || investorLoading" v-model:value="selected" :options="selectOptions"

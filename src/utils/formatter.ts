@@ -16,7 +16,7 @@ export const PercentFormatter = (preces: number = 2) => {
 const DIGIT_PATTERN = /(^|\s)\d+(?=\.?\d*($|\s))/g;
 const MILLI_PATTERN = /(?=(?!\b)(\d{3})+\.?\b)/g;
 
-export const CurrencyFormatter = (prefix: string = "￥", preces: number = 2) => {
+export const Thousandth = (preces: number = 0) => {
     return (v: number): string => {
         let minus = ""
         if (v < 0) {
@@ -27,6 +27,12 @@ export const CurrencyFormatter = (prefix: string = "￥", preces: number = 2) =>
 
         let result = value.replace(DIGIT_PATTERN, (m) => m.replace(MILLI_PATTERN, ","))
 
-        return `${prefix} ${minus}${result}.${decimal}`;
+        return `${minus}${result}${decimal? `.${decimal}`: ''}`;
+    }
+}
+
+export const CurrencyFormatter = (prefix: string = "￥", preces: number = 2) => {
+    return (v: number): string => {
+        return `${prefix} ${Thousandth(preces)(v)}`;
     }
 }

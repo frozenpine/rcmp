@@ -57,7 +57,7 @@ class AccountProxy {
 }
 
 const dataColumns = new Map<string, TableColumn<RowData>>([
-  ["broker_id", {title: "经纪商代码", key: "broker_id", titleAlign: "center"}],
+  ["broker_id", {title: "经纪商", key: "broker_id", titleAlign: "center"}],
   ["account_id", {title: "资金账号", key: "account_id", fixed: "left", width: 100, titleAlign: "center"}],
   ["account_name", {title: "账号名称", key: "account_name", fixed: "left", width: 100, titleAlign: "center"}],
   ["trading_day", {title: "交易日", key: "trading_day", fixed: "left", width: 100, titleAlign: "center"}],
@@ -285,8 +285,8 @@ const sortDown = (idx: number) => {
 
 type HeaderColumnOption = DropdownOption | DropdownGroupOption;
 
-const headerColumnOptions = computed((): HeaderColumnOptions[] => {
-  const header: HeaderColumnOption = [
+const headerColumnOptions = computed((): HeaderColumnOption[] => {
+  const header: HeaderColumnOption[] = [
     {
       key: 'header',
       type: 'render',
@@ -302,8 +302,8 @@ const headerColumnOptions = computed((): HeaderColumnOptions[] => {
                 value: showWaterMark.value,
                 onUpdateValue: (v) => showWaterMark.value = v,
               }, {
-                checked: "显示水印",
-                unchecked: "隐藏水印",
+                checked: () => "显示水印",
+                unchecked: () => "隐藏水印",
               }),
             ]
           }

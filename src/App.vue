@@ -18,7 +18,6 @@ import Statistics from "./components/Statistics.vue";
 import type {InvestorLoaderInst} from "./components/interface";
 
 import { fundStore } from "./store/fund.ts";
-import { DBGroup, DBInvestor } from "./models/db.ts";
 
 const fund = fundStore();
 

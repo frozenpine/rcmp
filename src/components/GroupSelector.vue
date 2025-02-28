@@ -7,7 +7,6 @@ import dayjs from "dayjs";
 import {useNotification} from "../utils/feedback.ts";
 import GroupEditor from "./GroupEditor.vue";
 import {EditNoteFilled, RefreshFilled} from "@vicons/material";
-import {DBGroup} from "../models/db.ts";
 
 const meta = metaStore();
 const notification = useNotification();
