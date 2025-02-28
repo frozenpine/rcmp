@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import {
-  type DataTableInst, type DataTableColumns,
-  type DataTableCreateSummary,
-  NDataTable, NDropdown, NWatermark, NFlex,
+  type DataTableInst, type DataTableColumns, type DataTableCreateSummary,
+  type DropdownOption, type DropdownGroupOption,
+  NDataTable, NDropdown, NWatermark, NFlex, NSwitch,
   NButton, NIcon, NCheckbox, NSpace, NButtonGroup,
 } from "naive-ui";
 import type {SummaryRowData, TableColumn} from "naive-ui/es/data-table/src/interface";
@@ -30,6 +30,7 @@ const CNY = CurrencyFormatter();
 const message = useMessage();
 
 const exportAll = ref(false);
+const showWaterMark = ref(false);
 
 interface RowData extends DBAccount {
   group?: DBAccount[];
@@ -254,7 +255,7 @@ const defaultColumns = computed(() => {
   });
 })
 
-const sortUp = (idx) => {
+const sortUp = (idx: number) => {
   if (idx === 0) return;
 
   const curr = displayedColumns.value[idx];
@@ -268,7 +269,7 @@ const sortUp = (idx) => {
   displayedColumns.value = pre_chain.concat([curr, pre].concat(next_chain));
 }
 
-const sortDown = (idx) => {
+const sortDown = (idx: number) => {
   if (idx === displayedColumns.value.length-1) return;
 
   const curr = displayedColumns.value[idx];
@@ -282,14 +283,45 @@ const sortDown = (idx) => {
   displayedColumns.value = pre_chain.concat([next, curr].concat(next_chain));
 }
 
-const headerColumnOptions = computed(() => {
-  return displayedColumns.value.map((v, idx) => {
+type HeaderColumnOption = DropdownOption | DropdownGroupOption;
+
+const headerColumnOptions = computed((): HeaderColumnOptions[] => {
+  const header: HeaderColumnOption = [
+    {
+      key: 'header',
+      type: 'render',
+      render: () => h(
+          NSpace,
+          {
+            justify: "end",
+            style: {margin: "5px 15px"},
+          },
+          {
+            default: () => [
+              h(NSwitch, {
+                value: showWaterMark.value,
+                onUpdateValue: (v) => showWaterMark.value = v,
+              }, {
+                checked: "显示水印",
+                unchecked: "隐藏水印",
+              }),
+            ]
+          }
+      ),
+    },
+    {
+      key: "header-divider",
+      type: 'divider',
+    }
+  ];
+  return header.concat(displayedColumns.value.map((v, idx): HeaderColumnOption => {
     return {
       type: "render",
       render: () => h(
           NSpace,
           {
-            justify: "space-between"
+            justify: "space-between",
+            style: {padding: "3px 15px"},
           },
           {
             default: () => [
@@ -329,7 +361,7 @@ const headerColumnOptions = computed(() => {
           }
       )
     }
-  })
+  }));
 });
 
 const getRowKey = (row: any): string => {
@@ -748,13 +780,18 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
                :x-offset="12"
                :y-offset="28"
                :rotate="-15"
-               cross selectable>
+               cross selectable v-if="showWaterMark && watermark">
     <n-data-table ref="dt" :columns="parentColumns as DataTableColumns<RowData>" :data="groupedData" :loading="loading"
                   :row-key="getRowKey" :row-props="rowProps"
                   :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
                   striped >
     </n-data-table>
   </n-watermark>
+  <n-data-table ref="dt" :columns="parentColumns as DataTableColumns<RowData>" :data="groupedData" :loading="loading"
+                :row-key="getRowKey" :row-props="rowProps"
+                :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
+                striped v-else>
+  </n-data-table>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
               :on-clickoutside="() => contextMenu.show = false" @select="handleMenuSelect"
               :options="[{label: '导出当前', key: 'page'}, {label: '导出全部', key: 'all'}, ]"></n-dropdown>
