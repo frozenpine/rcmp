@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {NButton, NButtonGroup, NIcon, NModal, NModalProvider, NSelect, NSpace} from "naive-ui";
+import {NButton, NButtonGroup, NIcon, NModal, NModalProvider, NSelect, NFlex} from "naive-ui";
 import {computed, h, ref} from "vue";
 
 import {metaStore} from "../store/meta.ts"
@@ -45,7 +45,7 @@ function loadGroupInvestors(force: boolean=false) {
           title: "投资者组查询完成",
           description: `投资者账号总计: ${investors.length}`,
           content: () => h(
-              NSpace, {vertical: true},
+              NFlex, {vertical: true},
               {
                 default: () => group_investors.map(
                     (g) => h("span", `投资者组[${g.group_name}]账号合计: ${g.investors?.length}`)
@@ -82,7 +82,7 @@ defineExpose({
             placeholder="请选择投资者组"
             size="small" tag filterable clearable>
     <template #action>
-      <n-space justify="end">
+      <n-flex justify="end">
         <n-button-group size="tiny">
           <n-button @click="loadGroupInvestors(true)" round>
             <template #icon><RefreshFilled/></template>
@@ -95,7 +95,7 @@ defineExpose({
             编辑
           </n-button>
         </n-button-group>
-      </n-space>
+      </n-flex>
     </template>
   </n-select>
 </template>

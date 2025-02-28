@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   type TreeSelectOption,
-  NTreeSelect, NSpace, NButton, NIcon,
+  NTreeSelect, NFlex, NButton, NIcon,
   NModalProvider, NModal, NButtonGroup,
 } from "naive-ui";
 import {RefreshFilled, EditNoteFilled} from "@vicons/material";
@@ -40,7 +40,7 @@ function loadGroupInvestors(force: boolean=false) {
           title: "投资者组查询完成",
           description: `投资者账号总计: ${investors.length}`,
           content: () => h(
-              NSpace, {vertical: true},
+              NFlex, {vertical: true},
               {
                 default: () => group_investors.map(
                     (g) => h("span", `投资者组[${g.group_name}]账号合计: ${g.investors?.length}`)

@@ -3,7 +3,7 @@ import {
   type DataTableInst, type DataTableColumns, type DataTableCreateSummary,
   type DropdownOption, type DropdownGroupOption,
   NDataTable, NDropdown, NWatermark, NFlex, NSwitch,
-  NButton, NIcon, NCheckbox, NSpace, NButtonGroup,
+  NButton, NIcon, NCheckbox, NButtonGroup,
 } from "naive-ui";
 import type {SummaryRowData, TableColumn} from "naive-ui/es/data-table/src/interface";
 import {h, nextTick, ref, computed} from "vue";
@@ -291,7 +291,7 @@ const headerColumnOptions = computed((): HeaderColumnOption[] => {
       key: 'header',
       type: 'render',
       render: () => h(
-          NSpace,
+          NFlex,
           {
             justify: "end",
             style: {margin: "5px 15px"},
@@ -318,7 +318,7 @@ const headerColumnOptions = computed((): HeaderColumnOption[] => {
     return {
       type: "render",
       render: () => h(
-          NSpace,
+          NFlex,
           {
             justify: "space-between",
             style: {padding: "3px 15px"},

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {DatabaseImport, Folder} from "@vicons/tabler";
-import {NButton, NButtonGroup, NIcon, NSpin, NSpace} from "naive-ui";
+import {NButton, NButtonGroup, NIcon, NSpin, NFlex} from "naive-ui";
 import {FileCsv} from "@vicons/fa";
 import {ref} from "vue";
 import {open} from "@tauri-apps/plugin-dialog";
@@ -43,7 +43,7 @@ async function sink_account(dir: boolean = false) {
 
 <template>
   <n-spin size="small" :show="parsing">
-    <n-space align="baseline" inline>
+    <n-flex align="baseline" inline>
       <n-icon style="margin-right: 5px" size="20"><DatabaseImport/></n-icon>
       <n-button-group size="small" :disabled="parsing">
         <n-button @click="()=> sink_account(true)" ghost round v-if="fromDir" >
@@ -57,7 +57,7 @@ async function sink_account(dir: boolean = false) {
           </template>
         </n-button>
       </n-button-group>
-    </n-space>
+    </n-flex>
   </n-spin>
 </template>
 
