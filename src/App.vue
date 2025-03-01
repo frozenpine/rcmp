@@ -95,7 +95,7 @@ onMounted(() => {
               }
               return pre
             },
-            []
+            [] as [number, Vacation[]][]
         ).reverse();
 
         notification.info({

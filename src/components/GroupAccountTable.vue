@@ -28,7 +28,12 @@ const {
   maxHeight = 500,
 } = defineProps<GroupAccountTableProps>();
 
+const CurrencyFmt = {
+  CNY: CurrencyFormatter(),
+  USD: CurrencyFormatter('$'),
+}
 const CNY = CurrencyFormatter();
+
 const message = useMessage();
 
 const exportAll = ref(false);
@@ -65,7 +70,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   ["trading_day", {title: "交易日", key: "trading_day", fixed: "left", width: 100, titleAlign: "center"}],
   ["frozen_balance", {
     title: "冻结权益", key: "frozen_balance", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.frozen_balance))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.frozen_balance))},
     ellipsis: {
       tooltip: true
     },
@@ -73,7 +78,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   }],
   ["pre_balance", {
     title: "昨权益", key: "pre_balance", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.pre_balance))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.pre_balance))},
     ellipsis: {
       tooltip: true
     },
@@ -81,7 +86,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   }],
   ["balance", {
     title: "今权益", key: "balance", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.balance))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.balance))},
     ellipsis: {
       tooltip: true
     },
@@ -89,7 +94,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   }],
   ["available", {
     title: "可用", key: "available", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.available))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.available))},
     ellipsis: {
       tooltip: true
     },
@@ -97,7 +102,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   }],
   ["deposit", {
     title: "入金", key: "deposit", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.deposit))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.deposit))},
     ellipsis: {
       tooltip: true
     },
@@ -105,7 +110,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   }],
   ["withdraw", {
     title: "出金", key: "withdraw", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.withdraw))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.withdraw))},
     ellipsis: {
       tooltip: true
     },
@@ -113,7 +118,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   }],
   ["margin", {
     title: "保证金", key: "margin", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.margin))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.margin))},
     ellipsis: {
       tooltip: true
     },
@@ -121,7 +126,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   }],
   ["frozen_margin", {
     title: "冻结保证金", key: "frozen_margin", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.frozen_margin))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.frozen_margin))},
     ellipsis: {
       tooltip: true
     },
@@ -129,7 +134,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   }],
   ["position_profit", {
     title: "持仓盈亏", key: "position_profit", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.position_profit))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.position_profit))},
     ellipsis: {
       tooltip: true
     },
@@ -137,7 +142,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   }],
   ["close_profit", {
     title: "平仓盈亏", key: "close_profit", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.close_profit))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.close_profit))},
     ellipsis: {
       tooltip: true
     },
@@ -145,7 +150,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   }],
   ["fee", {
     title: "手续费", key: "fee", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.fee))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.fee))},
     ellipsis: {
       tooltip: true
     },
@@ -153,7 +158,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   }],
   ["frozen_fee", {
     title: "冻结手续费", key: "frozen_fee", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.frozen_fee))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.frozen_fee))},
     ellipsis: {
       tooltip: true
     },
@@ -161,7 +166,7 @@ const dataColumns = new Map<string, TableColumn<RowData>>([
   }],
   ["net_profit", {
     title: "净盈亏", key: "net_profit", titleAlign: "center", align: "right",
-    render(row) {return h("label", CNY(row.net_profit))},
+    render(row) {return h("label", CurrencyFmt[row.currency_id](row.net_profit))},
     ellipsis: {
       tooltip: true
     },
@@ -517,12 +522,17 @@ const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): Sum
           colSpan: 3,
         },
         "deposit": {
-          value: h('span', {
+          value: h(NFlex, {
+            vertical: true,
             style: {fontColor: "red"},
-          }, CNY(monthData.reduce(
-              (pre, row) => pre + row.deposit,
-              0,
-          ))),
+          }, {
+            default: () => [...monthData.reduce(
+                (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.deposit),
+                new Map<string, number>([]),
+              ).entries()].map(([currency_id, value]) => {
+                return h("span", CurrencyFmt[currency_id](value));
+              }),
+          }),
         },
         "withdraw": {
           value: h('span', {

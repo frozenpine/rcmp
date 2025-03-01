@@ -5,7 +5,6 @@ import {User, Users, CalendarAlt, InfoCircle} from "@vicons/fa";
 
 import {metaStore} from "../store/meta.ts";
 import {Thousandth} from "../utils/formatter.ts"
-import dayjs from "dayjs";
 
 const meta = metaStore();
 const countFmt = Thousandth(0)

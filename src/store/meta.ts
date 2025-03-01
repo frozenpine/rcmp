@@ -49,7 +49,7 @@ export const metaStore = defineStore("meta", {
                 const endDate = dayjs(end) || state.lastDay;
 
                 if (endDate.isBefore(startDate)) {
-                    console.loe("invalid range:", startDate, endDate);
+                    console.log("invalid range:", startDate, endDate);
                     return undefined
                 }
 
@@ -60,7 +60,7 @@ export const metaStore = defineStore("meta", {
                 for (let i=0; i<diffDays; i++) {
                     const d = startDate.add(i, "day")
 
-                    if (!state.isHoliday(d)) {
+                    if (!(state as any).isHoliday(d)) {
                         result.push(d);
                     }
                 }
@@ -206,14 +206,14 @@ export const metaStore = defineStore("meta", {
                         .then((values) => {
                             this.vacation_list = values as Vacation[];
 
-                            this.holidays = new Map(
+                            this.holidays = new Map<string, Vacation>(
                                 this.vacation_list.reduce(
                                     (pre, curr) => pre.concat(
-                                        curr.range.map((d) => {
+                                        curr.range.map((d: string):[string, Vacation] => {
                                             return [d, curr]
                                         })
                                     ),
-                                    [],
+                                    [] as [string, Vacation][],
                                 )
                             )
 
