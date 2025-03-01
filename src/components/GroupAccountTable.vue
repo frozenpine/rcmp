@@ -28,7 +28,11 @@ const {
   maxHeight = 500,
 } = defineProps<GroupAccountTableProps>();
 
-const CurrencyFmt = {
+interface Formatter {
+  [index: string]: (value: number) => string;
+}
+
+const CurrencyFmt: Formatter = {
   CNY: CurrencyFormatter(),
   USD: CurrencyFormatter('$'),
 }
@@ -535,36 +539,57 @@ const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): Sum
           }),
         },
         "withdraw": {
-          value: h('span', {
+          value: h(NFlex, {
+            vertical: true,
             style: {fontColor: "green"},
-          }, CNY(monthData.reduce(
-              (pre, row) => pre + row.withdraw,
-              0,
-          ))),
+          }, {
+            default: () => [...monthData.reduce(
+                (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.withdraw),
+                new Map<string, number>([]),
+            ).entries()].map(([currency_id, value]) => {
+              return h("span", CurrencyFmt[currency_id](value));
+            })
+          }),
         },
         'position_profit': {
-          value: h('span', {}, CNY(monthData.reduce(
-              (pre, row) => pre + row.position_profit,
-              0,
-          ))),
+          value: h(NFlex, {vertical: true}, {
+            default: () => [...monthData.reduce(
+                (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.position_profit),
+                new Map<string, number>([]),
+            ).entries()].map(([currency_id, value]) => {
+              return h("span", CurrencyFmt[currency_id](value));
+            })
+          }),
         },
         'close_profit': {
-          value: h('span', {}, CNY(monthData.reduce(
-              (pre, row) => pre + row.close_profit,
-              0,
-          ))),
+          value: h(NFlex, {vertical: true}, {
+            default: () => [...monthData.reduce(
+                (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.close_profit),
+                new Map<string, number>([]),
+            ).entries()].map(([currency_id, value]) => {
+              return h("span", CurrencyFmt[currency_id](value));
+            })
+          }),
         },
         'fee': {
-          value: h('span', {}, CNY(monthData.reduce(
-              (pre, row) => pre + row.fee,
-              0,
-          ))),
+          value: h(NFlex, {vertical: true}, {
+            default: () => [...monthData.reduce(
+                (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.fee),
+                new Map<string, number>([]),
+            ).entries()].map(([currency_id, value]) => {
+              return h("span", CurrencyFmt[currency_id](value));
+            })
+          }),
         },
         'net_profit': {
-          value: h('span', {}, CNY(monthData.reduce(
-              (pre, row) => pre + row.net_profit,
-              0,
-          ))),
+          value: h(NFlex, {vertical: true}, {
+            default: () => [...monthData.reduce(
+                (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.net_profit),
+                new Map<string, number>([]),
+            ).entries()].map(([currency_id, value]) => {
+              return h("span", CurrencyFmt[currency_id](value));
+            })
+          }),
         },
       }
     }
