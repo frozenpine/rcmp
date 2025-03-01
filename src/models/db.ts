@@ -43,7 +43,7 @@ export interface DBInvestor {
 export interface Vacation {
     readonly year:number,
     readonly name: string,
-    readonly start: string,
-    readonly end: string,
+    readonly start: number,
+    readonly end: number,
     readonly range: string[],
 }

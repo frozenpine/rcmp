@@ -30,14 +30,13 @@ CREATE TABLE IF NOT EXISTS "group_info" (
 -- Table structure for holidays
 -- ----------------------------
 CREATE TABLE IF NOT EXISTS "holidays" (
-  "id" integer PRIMARY KEY AUTOINCREMENT,
-  "created_at" datetime,
-  "updated_at" datetime,
-  "deleted_at" datetime,
-  "year" integer,
-  "name" text NOT NULL,
-  "start" integer,
-  "end" integer
+    "year" integer NOT NULL,
+    "name" text NOT NULL,
+    "start" integer NOT NULL,
+    "end" integer NOT NULL,
+    "created_at" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted_at" datetime,
+    PRIMARY KEY ("year", "name", "start", "end")
 );
 
 -- ----------------------------
@@ -63,20 +62,6 @@ CREATE TABLE IF NOT EXISTS "investor_group" (
   "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "deleted_at" DATETIME,
   PRIMARY KEY ("group_name", "broker_id", "investor_id")
-);
-
--- ----------------------------
--- Indexes structure for table holidays
--- ----------------------------
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_holiday_range"
-ON "holidays" (
-  "year" ASC,
-  "start" ASC,
-  "end" ASC
-);
-CREATE INDEX IF NOT EXISTS "idx_holidays_deleted_at"
-ON "holidays" (
-  "deleted_at" ASC
 );
 
 PRAGMA foreign_keys = true;

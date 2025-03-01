@@ -8,6 +8,7 @@ export const metaStore = defineStore("meta", {
     state: () => {
         return {
             holidays: new Map([]) as Map<string, Vacation>,
+            vacation_list: [] as Array<Vacation>,
             investors: new Map([]) as Map<string, DBInvestor>,
             groups: new Map([]) as Map<string, DBGroup>,
             ungrouped: new Map([]) as Map<string, DBInvestor>,
@@ -157,5 +158,34 @@ export const metaStore = defineStore("meta", {
                 }).catch(reject);
             })
         },
+        async doQueryHolidays(force: boolean=false): Promise<Array<Vacation>> {
+            return new Promise((resolve, reject) => {
+                if (this.holidays.size > 0 && !force) {
+                    resolve(this.vacation_list);
+                } else {
+                    console.log("query holidays");
+
+                    invoke("query_holidays")
+                        .then((values) => {
+                            this.vacation_list = values as Vacation[];
+
+                            this.holidays = new Map(
+                                this.vacation_list.reduce(
+                                    (pre, curr) => pre.concat(
+                                        curr.range.map((d) => {
+                                            return [d, curr]
+                                        })
+                                    ),
+                                    [],
+                                )
+                            )
+
+                            console.log("holiday cache:", this.holidays);
+
+                            resolve(this.vacation_list);
+                        }).catch(reject);
+                }
+            })
+        }
     }
 })

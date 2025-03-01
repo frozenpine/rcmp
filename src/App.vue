@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import {ref, onMounted, computed} from "vue";
-import {useOsTheme, darkTheme, dateZhCN, zhCN} from 'naive-ui'
+import {ref, onMounted, computed, h} from "vue";
+import {useOsTheme, darkTheme, dateZhCN, zhCN, NFlex} from 'naive-ui'
 import {
   NConfigProvider, NMessageProvider, NBackTop, NNotificationProvider,
   NSpace, NButton, NIcon, NPopover, NH1, NText, NSwitch,
@@ -15,12 +15,15 @@ import TUAccountSinker from "./components/TUAccountSinker.vue"
 import GroupSelector from "./components/GroupSelector.vue";
 import InvestorSelector from "./components/InvestorSelector.vue";
 import Statistics from "./components/Statistics.vue";
+import {useNotification} from "./utils/feedback.ts";
 import type {InvestorLoaderInst} from "./components/interface";
 
 import { fundStore } from "./store/fund.ts";
+import {metaStore} from "./store/meta.ts";
+import {Vacation} from "./models/db.ts";
+import dayjs from "dayjs";
 
 const fund = fundStore();
-
 const osTheme = useOsTheme();
 
 const accountLoading = ref(false);
@@ -77,10 +80,57 @@ const contentHeight = computed(() => {
 onMounted(() => {
   windowHeight.value = window.innerHeight;
 
+  const notification = useNotification();
+  metaStore().doQueryHolidays()
+      .then((holidays) => {
+        const startYear = holidays[0].year;
+        const lastYear = holidays[holidays.length-1].year;
+
+        const yearVacations: Array<[number, Vacation[]]> = holidays.reduce(
+            (pre, curr) => {
+              if (pre.length === 0 || pre[pre.length-1][0] !== curr.year) {
+                pre.push([curr.year, [curr]])
+              } else {
+                pre[pre.length-1][1].push(curr)
+              }
+              return pre
+            },
+            []
+        );
+
+        notification.info({
+          title: "法定节假日查询完成",
+          description: `已获取 [${startYear} ~ ${lastYear}] ${yearVacations.length}年节假日信息`,
+          content: () => h(
+              NFlex, {vertical: true},
+              {
+                default: () => yearVacations.map(
+                    ([year, vacations]) => h(
+                        "span",
+                        `${year} 年共计 ${vacations.reduce((pre, curr) => pre + curr.range.length, 0)} 个法定节假日`
+                    )
+                )
+              }
+          ),
+          meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+          duration: 5000,
+        })
+      })
+      .catch((e) => {
+        console.log("load holidays failed:", e);
+
+        notification.error({
+          title: "法定节假日查询错误",
+          content: e.message,
+          closable: false,
+          meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+        })
+      })
+
   investorLoaderRef.value?.loadGroupInvestors();
 
   window.addEventListener("resize", (evt) => {
-    windowHeight.value = evt.target.innerHeight;
+    windowHeight.value = (evt.target! as any).innerHeight;
   })
 })
 </script>

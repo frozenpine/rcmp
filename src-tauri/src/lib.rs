@@ -114,6 +114,23 @@ async fn query_accounts(
     }
 }
 
+#[tauri::command]
+async fn query_holidays(
+    state: State<'_, Mutex<Config>>,
+) -> Result<Vec<db::DBHoliday>, String> {
+    let cfg = state.lock().await;
+
+    match cfg._db.as_ref() {
+        Some(db) => db.query_holidays()
+            .await
+            .map_err(|e| {
+                log::error!("query holidays failed: {:?}", e);
+                "query holidays failed".to_string()
+            }),
+        None => Err("no database initialized.".into())
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Derivative)]
 #[derivative(Debug)]
 struct Config {
@@ -226,6 +243,7 @@ pub fn run() {
             query_accounts,
             query_investors,
             mod_group_investors,
+            query_holidays,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -24,7 +24,6 @@ const {
 
 const meta = metaStore();
 const notification = useNotification();
-const emit = defineEmits(["group"])
 
 const selected = defineModel<string | undefined>("selected");
 
@@ -33,6 +32,7 @@ const investorLoading = ref(false);
 
 function loadGroupInvestors(force: boolean=false) {
   investorLoading.value = true;
+
   meta.doQueryInvestors({force: force})
       .then((investors) => {
         const group_investors = meta.groupInvestors;

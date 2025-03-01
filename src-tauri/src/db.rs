@@ -111,8 +111,19 @@ pub struct DBInvestor {
     pub groups: Option<Vec<DBInvestorGroup>>,
 }
 
+#[derive(Debug, Clone, Default, sqlx::FromRow, serde::Serialize, serde::Deserialize)]
+#[sqlx(default)]
+pub struct DBHoliday {
+    pub year: i32,
+    pub name: String,
+    pub start: i32,
+    pub end: i32,
+    #[sqlx(skip)]
+    pub range: Vec<String>,
+}
+
 #[derive(Debug, Clone)]
-pub struct Schema {
+struct Schema {
     name: String,
     dsn: String,
 }
@@ -483,6 +494,59 @@ WHERE group_name = $1 AND (broker_id, investor_id) NOT IN"#
         }
 
         Ok(group)
+    }
+
+    pub async fn query_holidays(&self) -> Result<Vec<DBHoliday>, Box<dyn Error>> {
+        if self.is_closed() {
+            return Err("DB is closed".into());
+        }
+
+        log::info!("querying vacations");
+
+        let mut qry_builder = sqlx::QueryBuilder::new(
+            r#"SELECT
+year, name, start, end
+FROM meta.holidays
+WHERE deleted_at IS NULL
+ORDER BY year, start"#);
+
+        let query = qry_builder.build_query_as::<DBHoliday>();
+
+        let mut holidays = query.fetch_all(&self.pool).await?;
+
+        for holiday in holidays.iter_mut() {
+            let start = match chrono::NaiveDate::from_ymd_opt(
+                holiday.start/10000,
+                holiday.start as u32 % 10000 / 100,
+                holiday.start as u32 % 100,
+            ) {
+                Some(date) => date,
+                None => {
+                    log::error!("parse start date failed: {:?}", holiday);
+                    return Err("parse start date failed".into());
+                }
+            };
+            
+            let end = match chrono::NaiveDate::from_ymd_opt(
+                holiday.end/10000,
+                holiday.end as u32 % 10000 / 100,
+                holiday.end as u32 % 100,
+            ) {
+                Some(date) => date,
+                None => {
+                    log::error!("parse end date failed: {:?}", holiday);
+                    return Err("parse end date failed".into());
+                }
+            };
+
+            for d in start.iter_days().take_while(
+                |d| *d <= end,
+            ) {
+                holiday.range.push(d.format("%Y-%m-%d").to_string());
+            }
+        }
+
+        Ok(holidays)
     }
 
     pub fn is_closed(&self) -> bool {
@@ -865,5 +929,28 @@ mod test {
         )).unwrap();
 
         log::info!("{:?}", g);
+    }
+    
+    #[test]
+    fn test_query_holidays() {
+        env_logger::Builder::new()
+            .filter_level(log::LevelFilter::Debug)
+            .target(env_logger::Target::Stdout)
+            .init();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let db = rt.block_on(open_db("./data", &["fund", "meta"]))
+            .unwrap();
+        
+        let result = rt.block_on(db.query_holidays())
+            .unwrap();
+        
+        for v in result {
+            log::info!("{:?}", v);
+        }
     }
 }

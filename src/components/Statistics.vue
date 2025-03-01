@@ -5,6 +5,7 @@ import {User, Users, CalendarAlt, InfoCircle} from "@vicons/fa";
 
 import {metaStore} from "../store/meta.ts";
 import {Thousandth} from "../utils/formatter.ts"
+import dayjs from "dayjs";
 
 const meta = metaStore();
 const countFmt = Thousandth(0)
@@ -24,6 +25,13 @@ const endPickerRef = ref();
 
 const selectedStart = defineModel<string | undefined>("start")
 const selectedEnd = defineModel<string | undefined>("end")
+
+function isHoliday(current: number): boolean {
+  const d = dayjs(current)
+  const weekDay = d.day()
+
+  return weekDay === 0 || weekDay === 6 || meta.isHoliday(d)
+}
 
 watch(
     () => [meta.firstDay, meta.lastDay],
@@ -52,6 +60,7 @@ watch(
             <n-icon size="15"><CalendarAlt/></n-icon>
           </template>
           <n-date-picker ref="startPickerRef" type="date" v-model:formatted-value="selectedStart"
+                         :is-date-disabled="isHoliday"
                          @blur="()=> startEdit = false" clearable v-if="startEdit" />
           <span class="content" v-else>{{selectedStart? selectedStart : firstDate}}</span>
           <template #suffix>
@@ -75,6 +84,7 @@ watch(
         <n-icon size="15"><CalendarAlt/></n-icon>
       </template>
       <n-date-picker ref="endPickerRef" type="date" v-model:formatted-value="selectedEnd"
+                     :is-date-disabled="isHoliday"
                      @blur="()=> endEdit = false" clearable v-if="endEdit" />
       <span class="content" v-else>{{selectedEnd? selectedEnd : lastDate}}</span>
       <template #suffix>
