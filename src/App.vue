@@ -96,7 +96,7 @@ onMounted(() => {
               return pre
             },
             []
-        );
+        ).reverse();
 
         notification.info({
           title: "法定节假日查询完成",
@@ -114,7 +114,7 @@ onMounted(() => {
           ),
           meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
           duration: 5000,
-        })
+        });
       })
       .catch((e) => {
         console.log("load holidays failed:", e);
