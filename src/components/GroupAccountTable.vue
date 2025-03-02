@@ -6,7 +6,7 @@ import {
   NButton, NIcon, NCheckbox, NButtonGroup, NEllipsis,
 } from "naive-ui";
 import type { SummaryRowData, TableColumn } from "naive-ui/es/data-table/src/interface";
-import { h, nextTick, ref, computed, defineComponent } from "vue";
+import { h, nextTick, ref, computed } from "vue";
 import dayjs from "dayjs";
 import { TextColumnOne20Filled, CaretUp16Filled, CaretDown16Filled } from "@vicons/fluent";
 
@@ -563,14 +563,35 @@ function handleMenuSelect(sel: string) {
   }
 }
 
-function calcSummary(data: RowData[], key: string): Map<string, number> {
+type SummaryKeys = "pre_balance" | "frozen_balance" | "balance" |
+  "available" | "deposit" | "withdraw" | "margin" | "frozen_margin" |
+  "fee" | "frozen_fee" | "position_profit" | "close_profit" | "net_profit";
+
+function calcSummary(data: RowData[], key: SummaryKeys, deep: boolean = false): Map<string, number> {
   return data.reduce(
-    (pre, curr) => pre.set(curr.currency_id, (pre.get(curr.currency_id) || 0) + (curr[key] as number)),
+    (pre, curr) => pre.set(
+      curr.currency_id,
+      (pre.get(curr.currency_id) || 0) + (
+        deep ? curr.group.reduce(
+          (pre, curr) => pre + (curr as any)[key] as number,
+          0
+        ) : (curr as any)[key] as number
+      ),
+    ),
     new Map<string, number>([])
   );
 }
 
-const summaryCell = defineComponent({});
+function makeSummaryCell(data: RowData[], key: SummaryKeys, deep: boolean = false) {
+  return h(
+    NFlex, {
+    vertical: true,
+  }, {
+    default: () => [...calcSummary(data, key, deep).entries()].map(([currency_id, value]) => {
+      return h(NEllipsis, CurrencyFmt[currency_id](value));
+    }),
+  });
+}
 
 const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData[] => {
   const lastDay = dayjs(pageData[0].trading_day);
@@ -597,70 +618,22 @@ const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): Sum
         colSpan: 3,
       },
       "deposit": {
-        value: h(NFlex, {
-          vertical: true,
-          style: { fontColor: "red" },
-        }, {
-          default: () => [...monthData.reduce(
-            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.deposit),
-            new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          }),
-        }),
+        value: makeSummaryCell(monthData, "deposit"),
       },
       "withdraw": {
-        value: h(NFlex, {
-          vertical: true,
-          style: { fontColor: "green" },
-        }, {
-          default: () => [...monthData.reduce(
-            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.withdraw),
-            new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
+        value: makeSummaryCell(monthData, "withdraw"),
       },
       'position_profit': {
-        value: h(NFlex, { vertical: true }, {
-          default: () => [...monthData.reduce(
-            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.position_profit),
-            new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
+        value: makeSummaryCell(monthData, "position_profit"),
       },
       'close_profit': {
-        value: h(NFlex, { vertical: true }, {
-          default: () => [...monthData.reduce(
-            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.close_profit),
-            new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
+        value: makeSummaryCell(monthData, "close_profit"),
       },
       'fee': {
-        value: h(NFlex, { vertical: true }, {
-          default: () => [...monthData.reduce(
-            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.fee),
-            new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
+        value: makeSummaryCell(monthData, "fee"),
       },
       'net_profit': {
-        value: h(NFlex, { vertical: true }, {
-          default: () => [...monthData.reduce(
-            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.net_profit),
-            new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
+        value: makeSummaryCell(monthData, "net_profit"),
       },
     }
   }
@@ -685,12 +658,12 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
   for (let idx = 0; idx < diffMonth; idx++) {
     const month = firstDay.add(idx, "month").format("YYYYMM");
 
-    const monthData: DBAccount[] = pageData.reduce(
+    const monthData: RowData[] = pageData.reduce(
       (pre, curr) => {
         return pre.concat((curr.group || [] as DBAccount[]).filter(
           (v) => { return v.trading_day.startsWith(month); }
         ));
-      }, [] as DBAccount[]
+      }, [] as RowData[]
     );
 
     monthSummary[idx] = {
@@ -699,70 +672,22 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
         colSpan: 3,
       },
       "deposit": {
-        value: h(NFlex, {
-          vertical: true,
-          style: { fontColor: "red" },
-        }, {
-          default: () => [...monthData.reduce(
-            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.deposit),
-            new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
+        value: makeSummaryCell(monthData, "deposit"),
       },
       "withdraw": {
-        value: h(NFlex, {
-          vertical: true,
-          style: { fontColor: "green" },
-        }, {
-          default: () => [...monthData.reduce(
-            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.withdraw),
-            new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
+        value: makeSummaryCell(monthData, "withdraw"),
       },
       'position_profit': {
-        value: h(NFlex, { vertical: true }, {
-          default: () => [...monthData.reduce(
-            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.position_profit),
-            new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
+        value: makeSummaryCell(monthData, "position_profit"),
       },
       'close_profit': {
-        value: h(NFlex, { vertical: true }, {
-          default: () => [...monthData.reduce(
-            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.close_profit),
-            new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
+        value: makeSummaryCell(monthData, "close_profit"),
       },
       'fee': {
-        value: h(NFlex, { vertical: true }, {
-          default: () => [...monthData.reduce(
-            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.fee),
-            new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
+        value: makeSummaryCell(monthData, "fee"),
       },
       'net_profit': {
-        value: h(NFlex, { vertical: true }, {
-          default: () => [...monthData.reduce(
-            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.net_profit),
-            new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
+        value: makeSummaryCell(monthData, "net_profit"),
       },
     }
   }
@@ -778,94 +703,28 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
       colSpan: 3,
     },
     'pre_balance': {
-      value: h(NFlex, {
-        class: "summary",
-        vertical: true,
-      }, {
-        default: () => [...pageData.reduce(
-          (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.pre_balance),
-          new Map<string, number>([]),
-        ).entries()].map(([currency_id, value]) => {
-          return h("span", CurrencyFmt[currency_id](value));
-        })
-      }),
+      value: makeSummaryCell(pageData, "pre_balance"),
     },
     'deposit': {
-      value: h(NFlex, {
-        class: "summary",
-        vertical: true,
-      }, {
-        default: () => [...pageData.reduce(
-          (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.deposit),
-          new Map<string, number>([]),
-        ).entries()].map(([currency_id, value]) => {
-          return h("span", CurrencyFmt[currency_id](value));
-        })
-      }),
+      value: makeSummaryCell(pageData, "deposit"),
     },
     'withdraw': {
-      value: h(NFlex, {
-        class: "summary",
-        vertical: true,
-      }, {
-        default: () => [...pageData.reduce(
-          (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.withdraw),
-          new Map<string, number>([]),
-        ).entries()].map(([currency_id, value]) => {
-          return h("span", CurrencyFmt[currency_id](value));
-        })
-      }),
+      value: makeSummaryCell(pageData, "withdraw"),
     },
     'balance': {
-      value: h(NFlex, {
-        class: "summary",
-        vertical: true,
-      }, {
-        default: () => [...pageData.reduce(
-          (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.balance),
-          new Map<string, number>([]),
-        ).entries()].map(([currency_id, value]) => {
-          return h("span", CurrencyFmt[currency_id](value));
-        })
-      }),
+      value: makeSummaryCell(pageData, "balance"),
     },
     'position_profit': {
-      value: h(NFlex, {
-        class: "summary",
-        vertical: true,
-      }, {
-        default: () => [...pageData.reduce(
-          (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.position_profit),
-          new Map<string, number>([]),
-        ).entries()].map(([currency_id, value]) => {
-          return h("span", CurrencyFmt[currency_id](value));
-        })
-      }),
+      value: makeSummaryCell(pageData, "position_profit"),
     },
     'close_profit': {
-      value: h(NFlex, {
-        class: "summary",
-        vertical: true,
-      }, {
-        default: () => [...pageData.reduce(
-          (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.close_profit),
-          new Map<string, number>([]),
-        ).entries()].map(([currency_id, value]) => {
-          return h("span", CurrencyFmt[currency_id](value));
-        })
-      }),
+      value: makeSummaryCell(pageData, "close_profit"),
     },
     'fee': {
-      value: h('span', { class: "summary", }, CNY(pageData.reduce(
-        (pre, row) => pre + row.fee,
-        0,
-      ))),
+      value: makeSummaryCell(pageData, "fee"),
     },
     'net_profit': {
-      value: h('span', { class: "summary", }, CNY(pageData.reduce(
-        (pre, row) => pre + row.net_profit,
-        0,
-      ))),
+      value: makeSummaryCell(pageData, "net_profit"),
     },
   }, {
     'account_id': {
@@ -878,70 +737,28 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
       colSpan: 3,
     },
     'pre_balance': {
-      value: h('span', { class: "summary", }, CNY(pageData.reduce(
-        (pre, row) => pre + row.pre_balance,
-        0,
-      ))),
+      value: makeSummaryCell(pageData, "pre_balance"),
     },
     'deposit': {
-      value: h('span', { class: "summary", }, CNY(pageData.reduce(
-        (pre, row) => pre + (row.group || []).reduce(
-          (pre, curr) => pre + curr.deposit,
-          0
-        ),
-        0,
-      ))),
+      value: makeSummaryCell(pageData, "deposit", true),
     },
     'withdraw': {
-      value: h('span', { class: "summary", }, CNY(pageData.reduce(
-        (pre, row) => pre + (row.group || []).reduce(
-          (pre, curr) => pre + curr.withdraw,
-          0
-        ),
-        0,
-      ))),
+      value: makeSummaryCell(pageData, "withdraw", true),
     },
     'balance': {
-      value: h('span', { class: "summary", }, CNY(pageData.reduce(
-        (pre, row) => pre + row.balance,
-        0,
-      ))),
+      value: makeSummaryCell(pageData, "balance"),
     },
     'position_profit': {
-      value: h('span', { class: "summary", }, CNY(pageData.reduce(
-        (pre, row) => pre + (row.group || []).reduce(
-          (pre, curr) => pre + curr.position_profit,
-          0
-        ),
-        0,
-      ))),
+      value: makeSummaryCell(pageData, "position_profit", true),
     },
     'close_profit': {
-      value: h('span', { class: "summary", }, CNY(pageData.reduce(
-        (pre, row) => pre + (row.group || []).reduce(
-          (pre, curr) => pre + curr.close_profit,
-          0
-        ),
-        0,
-      ))),
+      value: makeSummaryCell(pageData, "close_profit", true),
     },
     'fee': {
-      value: h('span', { class: "summary", }, CNY(pageData.reduce(
-        (pre, row) => pre + (row.group || []).reduce(
-          (pre, curr) => pre + curr.fee,
-          0
-        ),
-        0,
-      ))),
+      value: makeSummaryCell(pageData, "fee", true),
     },
     'net_profit': {
-      value: h('span', { class: "summary", }, CNY(pageData.reduce(
-        (pre, row) => pre + (row.group || []).reduce(
-          (pre, curr) => pre + curr.net_profit,
-          0
-        ),
-        0,
-      ))),
+      value: makeSummaryCell(pageData, "net_profit", true),
     },
   }]);
 }
