@@ -6,7 +6,7 @@ import {
   NButton, NIcon, NCheckbox, NButtonGroup,
 } from "naive-ui";
 import type {SummaryRowData, TableColumn} from "naive-ui/es/data-table/src/interface";
-import {h, nextTick, ref, computed} from "vue";
+import {h, nextTick, ref, computed, defineComponent} from "vue";
 import dayjs from "dayjs";
 import {TextColumnOne20Filled, CaretUp16Filled, CaretDown16Filled} from "@vicons/fluent";
 
@@ -44,12 +44,15 @@ const exportAll = ref(false);
 const showWaterMark = ref(false);
 
 interface RowData extends DBAccount {
-  group?: DBAccount[];
+  [key: string]: number | RowData[];
+  group?: RowData[];
+  summary?: (data: RowData[]) => string | number;
+  groupSummary?: (data: RowData[]) => string | number;
 }
 
 class AccountProxy {
-  private readonly _inner: DBAccount;
-  readonly group: DBAccount[];
+  private readonly _inner: RowData;
+  readonly group: RowData[];
 
   constructor(inner: DBAccount) {
     this._inner = inner;
@@ -62,237 +65,279 @@ class AccountProxy {
     }
   }
 
-  get value(): string {
+  get identity(): string {
     return [this._inner.broker_id, this._inner.account_id].join(".");
+  }
+
+  get rowKey(): string {
+    return [this.identity, this._inner.currency_id].join(".");
   }
 }
 
-const dataColumns = new Map<string, TableColumn<RowData>>([
-  ["broker_id", {title: "经纪商", key: "broker_id", titleAlign: "center"}],
-  ["account_id", {title: "资金账号", key: "account_id", fixed: "left", width: 100, titleAlign: "center"}],
-  ["account_name", {title: "账号名称", key: "account_name", fixed: "left", width: 100, titleAlign: "center"}],
-  ["trading_day", {title: "交易日", key: "trading_day", fixed: "left", width: 100, titleAlign: "center"}],
-  ["frozen_balance", {
-    title: "冻结权益", key: "frozen_balance", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.frozen_balance))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["pre_balance", {
-    title: "昨权益", key: "pre_balance", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.pre_balance))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["balance", {
-    title: "今权益", key: "balance", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.balance))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["available", {
-    title: "可用", key: "available", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.available))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["deposit", {
-    title: "入金", key: "deposit", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.deposit))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["withdraw", {
-    title: "出金", key: "withdraw", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.withdraw))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["margin", {
-    title: "保证金", key: "margin", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.margin))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["frozen_margin", {
-    title: "冻结保证金", key: "frozen_margin", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.frozen_margin))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["position_profit", {
-    title: "持仓盈亏", key: "position_profit", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.position_profit))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["close_profit", {
-    title: "平仓盈亏", key: "close_profit", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.close_profit))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["fee", {
-    title: "手续费", key: "fee", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.fee))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["frozen_fee", {
-    title: "冻结手续费", key: "frozen_fee", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.frozen_fee))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["net_profit", {
-    title: "净盈亏", key: "net_profit", titleAlign: "center", align: "right",
-    render(row) {return h("label", CurrencyFmt[row.currency_id](row.net_profit))},
-    ellipsis: {
-      tooltip: true
-    },
-    resizable: true,
-  }],
-  ["currency_id", {title: "币种", key: "currency_id", fixed: "right", width: 60, titleAlign: "center", align: "right"}],
-])
-
-const displayedColumns = ref<{
+interface ColumnDefine extends TableColumn<RowData> {
   key: string,
   show?: boolean,
   fixed?: boolean,
   sortable: boolean,
-}[]>([{
-  key: "broker_id",
-  show: false,
-  sortable: false,
-}, {
-  key: "account_id",
-  fixed: true,
-  sortable: false,
-}, {
-  key: "account_name",
-  fixed: true,
-  sortable: false,
-}, {
-  key: "trading_day",
-  fixed: true,
-  sortable: false,
-}, {
-  key: "pre_balance",
-  show: true,
-  sortable: true,
-}, {
-  key: "deposit",
-  show: true,
-  sortable: true,
-}, {
-  key: "withdraw",
-  show: true,
-  sortable: true,
-}, {
-  key: "balance",
-  fixed: true,
-  sortable: true,
-}, {
-  key: "frozen_balance",
-  show: false,
-  sortable: true,
-}, {
-  key: "available",
-  show: false,
-  sortable: true,
-}, {
-  key: "margin",
-  show: false,
-  sortable: true,
-}, {
-  key: "frozen_margin",
-  show: false,
-  sortable: true,
-}, {
-  key: "position_profit",
-  fixed: true,
-  sortable: true,
-}, {
-  key: "close_profit",
-  fixed: true,
-  sortable: true,
-}, {
-  key: "fee",
-  fixed: true,
-  sortable: true,
-}, {
-  key: "frozen_fee",
-  show: false,
-  sortable: true,
-}, {
-  key: "net_profit",
-  fixed: true,
-  sortable: true,
-}, {
-  key: "currency_id",
-  show: true,
-  sortable: false,
-},]);
+}
 
-const defaultColumns = computed(() => {
-  return displayedColumns.value.filter(
+class ColumnDefineProxy implements ColumnDefine {
+  constructor(value: ColumnDefine) {
+    for (const key in value) {
+      this[key] = value[key];
+    }
+  }
+
+  sortUp(idx: number) {
+    if (idx === 0) return;
+
+    const curr = dataColumns.value[idx];
+    const pre = dataColumns.value[idx-1];
+
+    if (pre && !pre.sortable) return;
+
+    const pre_chain = dataColumns.value.slice(0, idx-1);
+    const next_chain = dataColumns.value.slice(idx+1);
+
+    dataColumns.value = pre_chain.concat([curr, pre].concat(next_chain));
+  };
+
+  sortDown(idx: number) {
+    if (idx === dataColumns.value.length-1) return;
+
+    const curr = dataColumns.value[idx];
+    const next = dataColumns.value[idx+1];
+
+    if (next && !next.sortable) return;
+
+    const pre_chain = dataColumns.value.slice(0, idx);
+    const next_chain = dataColumns.value.slice(idx+2)
+
+    dataColumns.value = pre_chain.concat([next, curr].concat(next_chain));
+  }
+}
+
+const dataColumns = ref<Array<ColumnDefine>>([
+  new ColumnDefineProxy({
+    title: "经纪商",
+    key: "broker_id",
+    titleAlign: "center",
+    show: false,
+    sortable: false,
+  }),
+  new ColumnDefineProxy({
+    title: "资金账号",
+    key: "account_id",
+    fixed: "left",
+    width: 100,
+    titleAlign: "center"
+  }),
+  new ColumnDefineProxy({
+    title: "账号名称",
+    key: "account_name",
+    fixed: "left",
+    width: 100,
+    titleAlign: "center",
+  }),
+  new ColumnDefineProxy({
+    title: "交易日",
+    key: "trading_day",
+    fixed: "left",
+    width: 100,
+    titleAlign: "center",
+  }),
+  new ColumnDefineProxy({
+    title: "昨权益",
+    key: "pre_balance",
+    show: true,
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.pre_balance))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "入金",
+    key: "deposit",
+    show: true,
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.deposit))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "出金",
+    key: "withdraw",
+    show: true,
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.withdraw))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "今权益",
+    key: "balance",
+    show: true,
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.balance))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "冻结权益",
+    key: "frozen_balance",
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.frozen_balance))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "可用",
+    key: "available",
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.available))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "保证金",
+    key: "margin",
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.margin))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "冻结保证金",
+    key: "frozen_margin",
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.frozen_margin))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "持仓盈亏",
+    key: "position_profit",
+    show: true,
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.position_profit))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "平仓盈亏",
+    key: "close_profit",
+    show: true,
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.close_profit))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "手续费",
+    key: "fee",
+    show: true,
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.fee))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "冻结手续费",
+    key: "frozen_fee",
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.frozen_fee))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "净盈亏",
+    key: "net_profit",
+    show: true,
+    titleAlign: "center",
+    align: "right",
+    render(row) {
+      return h("label", CurrencyFmt[row.currency_id](row.net_profit))
+    },
+    ellipsis: {
+      tooltip: true
+    },
+    resizable: true,
+  }),
+  new ColumnDefineProxy({
+    title: "币种",
+    key: "currency_id",
+    fixed: "right",
+    width: 60,
+    titleAlign: "center",
+    align: "right",
+  }),
+])
+
+const defaultColumns = computed((): DataTableColumns<RowData> => {
+  return dataColumns.value.filter(
       (v) => v.fixed || v.show
-  ).map((v) => {
-    return dataColumns.get(v.key)
-  });
+  );
 })
-
-const sortUp = (idx: number) => {
-  if (idx === 0) return;
-
-  const curr = displayedColumns.value[idx];
-  const pre = displayedColumns.value[idx-1];
-
-  if (pre && !pre.sortable) return;
-
-  const pre_chain = displayedColumns.value.slice(0, idx-1);
-  const next_chain = displayedColumns.value.slice(idx+1);
-
-  displayedColumns.value = pre_chain.concat([curr, pre].concat(next_chain));
-}
-
-const sortDown = (idx: number) => {
-  if (idx === displayedColumns.value.length-1) return;
-
-  const curr = displayedColumns.value[idx];
-  const next = displayedColumns.value[idx+1];
-
-  if (next && !next.sortable) return;
-
-  const pre_chain = displayedColumns.value.slice(0, idx);
-  const next_chain = displayedColumns.value.slice(idx+2)
-
-  displayedColumns.value = pre_chain.concat([next, curr].concat(next_chain));
-}
 
 type HeaderColumnOption = DropdownOption | DropdownGroupOption;
 
@@ -325,7 +370,7 @@ const headerColumnOptions = computed((): HeaderColumnOption[] => {
       type: 'divider',
     }
   ];
-  return header.concat(displayedColumns.value.map((v, idx): HeaderColumnOption => {
+  return header.concat(dataColumns.value.map((v, idx): HeaderColumnOption => {
     return {
       type: "render",
       render: () => h(
@@ -343,7 +388,7 @@ const headerColumnOptions = computed((): HeaderColumnOption[] => {
                     onUpdateChecked: (b) => v.show = b,
                     style: {padding: "3px 15px"}
                   },
-                  {default: () => (dataColumns.get(v.key) as any).title}),
+                  {default: () => v.title}),
               h(NButtonGroup,
                   {
                     size: "tiny",
@@ -352,17 +397,17 @@ const headerColumnOptions = computed((): HeaderColumnOption[] => {
                     default: () => [
                       h(NButton, {
                         round: true,
-                        disabled: idx === 0 || !v.sortable || !displayedColumns.value[idx-1].sortable,
+                        disabled: idx === 0 || !v.sortable || !dataColumns.value[idx-1].sortable,
                         focusable: false,
-                        onClick: () => sortUp(idx),
+                        onClick: () => v.sortUp(idx),
                       }, {
                         default: () => h(NIcon, {component: CaretUp16Filled})
                       }),
                       h(NButton, {
                         round: true,
-                        disabled: idx === displayedColumns.value.length - 1 || !v.sortable || !displayedColumns.value[idx+1].sortable,
+                        disabled: idx === dataColumns.value.length - 1 || !v.sortable || !dataColumns.value[idx+1].sortable,
                         focusable: false,
-                        onClick: () => sortDown(idx),
+                        onClick: () => v.sortDown(idx),
                       }, {
                         default: () => h(NIcon, {component: CaretDown16Filled})
                       })
@@ -374,11 +419,6 @@ const headerColumnOptions = computed((): HeaderColumnOption[] => {
     }
   }));
 });
-
-const getRowKey = (row: any): string => {
-  const data = row as RowData;
-  return [data.trading_day, data.broker_id, data.account_id, data.currency_id].join(".")
-}
 
 const rowProps = (_: RowData) => {
   return {
@@ -425,7 +465,7 @@ const parentColumns = computed(() => {
             NDataTable,
             {
               columns: (defaultColumns.value as DataTableColumns<RowData>),
-              rowKey: getRowKey,
+              rowKey: (row) => row.rowKey,
               striped: true,
               data: row.group!,
               virtualScroll: true,
@@ -500,6 +540,15 @@ function handleMenuSelect(sel: string) {
     }
   }
 }
+
+function calcSummary(data: RowData[], key: string): Map<string, number> {
+  return data.reduce(
+      (pre, curr) => pre.set(curr.currency_id, (pre.get(curr.currency_id) || 0) + curr[key]),
+      new Map<string, number>([])
+  );
+}
+
+const summaryCell = defineComponent({});
 
 const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData[] => {
     const lastDay = dayjs(pageData[0].trading_day);
@@ -628,44 +677,70 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
             colSpan: 3,
           },
           "deposit": {
-            value: h('span', {
+            value: h(NFlex, {
+              vertical: true,
               style: {fontColor: "red"},
-            }, CNY(monthData.reduce(
-                (pre, row) => pre + row.deposit,
-                0,
-            ))),
+            }, {
+              default: () => [...monthData.reduce(
+                  (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.deposit),
+                  new Map<string, number>([]),
+              ).entries()].map(([currency_id, value]) => {
+                return h("span", CurrencyFmt[currency_id](value));
+              })
+            }),
           },
           "withdraw": {
-            value: h('span', {
+            value: h(NFlex, {
+              vertical: true,
               style: {fontColor: "green"},
-            }, CNY(monthData.reduce(
-                (pre, row) => pre + row.withdraw,
-                0,
-            ))),
+            }, {
+              default: () => [...monthData.reduce(
+                  (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.withdraw),
+                  new Map<string, number>([]),
+              ).entries()].map(([currency_id, value]) => {
+                return h("span", CurrencyFmt[currency_id](value));
+              })
+            }),
           },
           'position_profit': {
-            value: h('span', {}, CNY(monthData.reduce(
-                (pre, row) => pre + row.position_profit,
-                0,
-            ))),
+            value: h(NFlex, {vertical: true}, {
+              default: () => [...monthData.reduce(
+                  (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.position_profit),
+                  new Map<string, number>([]),
+              ).entries()].map(([currency_id, value]) => {
+                return h("span", CurrencyFmt[currency_id](value));
+              })
+            }),
           },
           'close_profit': {
-            value: h('span', {}, CNY(monthData.reduce(
-                (pre, row) => pre + row.close_profit,
-                0,
-            ))),
+            value: h(NFlex, {vertical: true}, {
+              default: () => [...monthData.reduce(
+                  (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.close_profit),
+                  new Map<string, number>([]),
+              ).entries()].map(([currency_id, value]) => {
+                return h("span", CurrencyFmt[currency_id](value));
+              })
+            }),
           },
           'fee': {
-            value: h('span', {}, CNY(monthData.reduce(
-                (pre, row) => pre + row.fee,
-                0,
-            ))),
+            value: h(NFlex, {vertical: true}, {
+              default: () => [...monthData.reduce(
+                  (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.fee),
+                  new Map<string, number>([]),
+              ).entries()].map(([currency_id, value]) => {
+                return h("span", CurrencyFmt[currency_id](value));
+              })
+            }),
           },
           'net_profit': {
-            value: h('span', {}, CNY(monthData.reduce(
-                (pre, row) => pre + row.net_profit,
-                0,
-            ))),
+            value: h(NFlex, {vertical: true}, {
+              default: () => [...monthData.reduce(
+                  (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.net_profit),
+                  new Map<string, number>([]),
+              ).entries()].map(([currency_id, value]) => {
+                return h("span", CurrencyFmt[currency_id](value));
+              })
+            }),
           },
         }
     }
@@ -681,40 +756,82 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
         colSpan: 3,
       },
       'pre_balance': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.pre_balance,
-            0,
-        ))),
+        value: h(NFlex, {
+          class: "summary",
+          vertical: true,
+        }, {
+          default: () => [...pageData.reduce(
+              (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.pre_balance),
+              new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) =>{
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
       },
       'deposit': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.deposit,
-            0,
-        ))),
+        value: h(NFlex, {
+          class: "summary",
+          vertical: true,
+        }, {
+          default: () => [...pageData.reduce(
+              (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.deposit),
+              new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
       },
       'withdraw': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.withdraw,
-            0,
-        ))),
+        value: h(NFlex, {
+          class: "summary",
+          vertical: true,
+        }, {
+          default: () => [...pageData.reduce(
+              (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.withdraw),
+              new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
       },
       'balance': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.balance,
-            0,
-        ))),
+        value: h(NFlex, {
+          class: "summary",
+          vertical: true,
+        }, {
+          default: () => [...pageData.reduce(
+              (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.balance),
+              new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
       },
       'position_profit': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.position_profit,
-            0,
-        ))),
+        value: h(NFlex, {
+          class: "summary",
+          vertical: true,
+        }, {
+          default: () => [...pageData.reduce(
+              (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.position_profit),
+              new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
       },
       'close_profit': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.close_profit,
-            0,
-        ))),
+        value: h(NFlex, {
+          class: "summary",
+          vertical: true,
+        }, {
+          default: () => [...pageData.reduce(
+              (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.close_profit),
+              new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
       },
       'fee': {
         value: h('span', {class: "summary",}, CNY(pageData.reduce(
@@ -728,7 +845,7 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
             0,
         ))),
       },
-    },{
+    }, {
       'account_id': {
         value: h(NFlex, {
           justify: "end",
@@ -819,13 +936,13 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
                :rotate="-15"
                cross selectable v-if="showWaterMark && watermark">
     <n-data-table ref="dt" :columns="parentColumns as DataTableColumns<RowData>" :data="groupedData" :loading="loading"
-                  :row-key="getRowKey" :row-props="rowProps"
+                  :row-key="(row) => row.rowKey" :row-props="rowProps"
                   :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
                   striped >
     </n-data-table>
   </n-watermark>
   <n-data-table ref="dt" :columns="parentColumns as DataTableColumns<RowData>" :data="groupedData" :loading="loading"
-                :row-key="getRowKey" :row-props="rowProps"
+                :row-key="(row) => row.rowKey" :row-props="rowProps"
                 :max-height="maxHeight"
                 :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
                 striped v-else>
