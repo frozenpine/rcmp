@@ -3,16 +3,16 @@ import {
   type DataTableInst, type DataTableColumns, type DataTableCreateSummary,
   type DropdownOption, type DropdownGroupOption,
   NDataTable, NDropdown, NWatermark, NFlex, NSwitch,
-  NButton, NIcon, NCheckbox, NButtonGroup,
+  NButton, NIcon, NCheckbox, NButtonGroup, NEllipsis,
 } from "naive-ui";
-import type {SummaryRowData, TableColumn} from "naive-ui/es/data-table/src/interface";
-import {h, nextTick, ref, computed, defineComponent} from "vue";
+import type { SummaryRowData, TableColumn } from "naive-ui/es/data-table/src/interface";
+import { h, nextTick, ref, computed, defineComponent } from "vue";
 import dayjs from "dayjs";
-import {TextColumnOne20Filled, CaretUp16Filled, CaretDown16Filled} from "@vicons/fluent";
+import { TextColumnOne20Filled, CaretUp16Filled, CaretDown16Filled } from "@vicons/fluent";
 
-import {CurrencyFormatter} from "../utils/formatter.ts";
-import {useMessage} from "../utils/feedback.ts";
-import {DBAccount} from "../models/db.ts";
+import { CurrencyFormatter } from "../utils/formatter.ts";
+import { useMessage } from "../utils/feedback.ts";
+import { DBAccount } from "../models/db.ts";
 
 interface GroupAccountTableProps {
   loading?: boolean;
@@ -44,88 +44,93 @@ const exportAll = ref(false);
 const showWaterMark = ref(false);
 
 interface RowData extends DBAccount {
-  [key: string]: number | RowData[];
-  group?: RowData[];
-  summary?: (data: RowData[]) => string | number;
-  groupSummary?: (data: RowData[]) => string | number;
+  group: RowData[];
+  identity: string;
+  rowKey: string;
 }
 
-class AccountProxy {
-  private readonly _inner: RowData;
-  readonly group: RowData[];
+function defineAccount(acct: RowData) {
+  const group: RowData[] = [];
 
-  constructor(inner: DBAccount) {
-    this._inner = inner;
-    this.group = [];
-
-    for (const key in inner) {
-      Object.defineProperty(this, key, {
-        get() {return this._inner[key];}
-      })
+  return new Proxy(acct, {
+    get: (target, propKey) => {
+      switch (propKey) {
+        case "identity":
+          return [target.broker_id, target.account_id].join(".")
+        case "rowKey":
+          return [target.broker_id, target.account_id, target.currency_id].join(".")
+        case "group":
+          return group;
+        default:
+          return (target as any)[propKey]
+      }
     }
-  }
-
-  get identity(): string {
-    return [this._inner.broker_id, this._inner.account_id].join(".");
-  }
-
-  get rowKey(): string {
-    return [this.identity, this._inner.currency_id].join(".");
-  }
+  })
 }
 
-interface ColumnDefine extends TableColumn<RowData> {
-  key: string,
+interface ColumnDisplayDefine {
+  [index: string | symbol]: any;
   show?: boolean,
-  fixed?: boolean,
   sortable: boolean,
 }
 
-class ColumnDefineProxy implements ColumnDefine {
-  constructor(value: ColumnDefine) {
-    for (const key in value) {
-      this[key] = value[key];
+function defineColumn(col: ColumnDisplayDefine & TableColumn<RowData>) {
+  return new Proxy(col, {
+    get: (target, propKey) => {
+      switch (propKey) {
+        case "checkUp": {
+          return (idx: number) => idx === 0 || !target.sortable || !dataColumns.value[idx - 1].sortable
+        }
+        case "checkDown": {
+          return (idx: number) => idx === dataColumns.value.length - 1 || !target.sortable || !dataColumns.value[idx + 1].sortable
+        }
+        case "sortUp": {
+          return (idx: number) => {
+            if (idx === 0) return;
+
+            const curr = dataColumns.value[idx];
+            const pre = dataColumns.value[idx - 1];
+
+            if (pre && !pre.sortable) return;
+
+            const pre_chain = dataColumns.value.slice(0, idx - 1);
+            const next_chain = dataColumns.value.slice(idx + 1);
+
+            dataColumns.value = pre_chain.concat([curr, pre].concat(next_chain));
+          }
+        }
+        case "sortDown": {
+          return (idx: number) => {
+            if (idx === dataColumns.value.length - 1) return;
+
+            const curr = dataColumns.value[idx];
+            const next = dataColumns.value[idx + 1];
+
+            if (next && !next.sortable) return;
+
+            const pre_chain = dataColumns.value.slice(0, idx);
+            const next_chain = dataColumns.value.slice(idx + 2)
+
+            dataColumns.value = pre_chain.concat([next, curr].concat(next_chain));
+          }
+        }
+        default: {
+          return target[propKey];
+        }
+      }
     }
-  }
-
-  sortUp(idx: number) {
-    if (idx === 0) return;
-
-    const curr = dataColumns.value[idx];
-    const pre = dataColumns.value[idx-1];
-
-    if (pre && !pre.sortable) return;
-
-    const pre_chain = dataColumns.value.slice(0, idx-1);
-    const next_chain = dataColumns.value.slice(idx+1);
-
-    dataColumns.value = pre_chain.concat([curr, pre].concat(next_chain));
-  };
-
-  sortDown(idx: number) {
-    if (idx === dataColumns.value.length-1) return;
-
-    const curr = dataColumns.value[idx];
-    const next = dataColumns.value[idx+1];
-
-    if (next && !next.sortable) return;
-
-    const pre_chain = dataColumns.value.slice(0, idx);
-    const next_chain = dataColumns.value.slice(idx+2)
-
-    dataColumns.value = pre_chain.concat([next, curr].concat(next_chain));
-  }
+  })
 }
 
-const dataColumns = ref<Array<ColumnDefine>>([
-  new ColumnDefineProxy({
+const dataColumns = ref([
+  defineColumn({
     title: "经纪商",
     key: "broker_id",
     titleAlign: "center",
     show: false,
     sortable: false,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "资金账号",
     key: "account_id",
     fixed: "left",
@@ -133,7 +138,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     width: 100,
     titleAlign: "center"
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "账号名称",
     key: "account_name",
     fixed: "left",
@@ -141,7 +146,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     width: 100,
     titleAlign: "center",
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "交易日",
     key: "trading_day",
     fixed: "left",
@@ -149,7 +154,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     width: 100,
     titleAlign: "center",
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "昨权益",
     key: "pre_balance",
     show: true,
@@ -164,7 +169,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "入金",
     key: "deposit",
     show: true,
@@ -179,7 +184,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "出金",
     key: "withdraw",
     show: true,
@@ -194,7 +199,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "今权益",
     key: "balance",
     show: true,
@@ -209,7 +214,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "冻结权益",
     key: "frozen_balance",
     sortable: true,
@@ -223,7 +228,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "可用",
     key: "available",
     sortable: true,
@@ -237,7 +242,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "保证金",
     key: "margin",
     sortable: true,
@@ -251,7 +256,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "冻结保证金",
     key: "frozen_margin",
     sortable: true,
@@ -265,7 +270,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "持仓盈亏",
     key: "position_profit",
     show: true,
@@ -280,7 +285,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "平仓盈亏",
     key: "close_profit",
     show: true,
@@ -295,7 +300,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "手续费",
     key: "fee",
     show: true,
@@ -310,7 +315,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "冻结手续费",
     key: "frozen_fee",
     sortable: true,
@@ -324,7 +329,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "净盈亏",
     key: "net_profit",
     show: true,
@@ -339,7 +344,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     },
     resizable: true,
   }),
-  new ColumnDefineProxy({
+  defineColumn({
     title: "币种",
     key: "currency_id",
     fixed: "right",
@@ -352,8 +357,8 @@ const dataColumns = ref<Array<ColumnDefine>>([
 
 const displayedColumns = computed((): DataTableColumns<RowData> => {
   return dataColumns.value.filter(
-      (v) => v.fixed || v.show
-  );
+    (v) => v.fixed || v.show
+  ) as unknown as DataTableColumns<RowData>;
 })
 
 type HeaderColumnOption = DropdownOption | DropdownGroupOption;
@@ -364,22 +369,22 @@ const headerColumnOptions = computed((): HeaderColumnOption[] => {
       key: 'header',
       type: 'render',
       render: () => h(
-          NFlex,
-          {
-            justify: "end",
-            style: {margin: "5px 15px"},
-          },
-          {
-            default: () => [
-              h(NSwitch, {
-                value: showWaterMark.value,
-                onUpdateValue: (v) => showWaterMark.value = v,
-              }, {
-                checked: () => "显示水印",
-                unchecked: () => "隐藏水印",
-              }),
-            ]
-          }
+        NFlex,
+        {
+          justify: "end",
+          style: { margin: "5px 15px" },
+        },
+        {
+          default: () => [
+            h(NSwitch, {
+              value: showWaterMark.value,
+              onUpdateValue: (v) => showWaterMark.value = v,
+            }, {
+              checked: () => "显示水印",
+              unchecked: () => "隐藏水印",
+            }),
+          ]
+        }
       ),
     },
     {
@@ -391,47 +396,47 @@ const headerColumnOptions = computed((): HeaderColumnOption[] => {
     return {
       type: "render",
       render: () => h(
-          NFlex,
-          {
-            justify: "space-between",
-            style: {padding: "3px 15px"},
-          },
-          {
-            default: () => [
-              h(NCheckbox,
-                  {
-                    checked: v.fixed || v.show,
-                    disabled: v.fixed,
-                    onUpdateChecked: (b) => v.show = b,
-                    style: {padding: "3px 15px"}
-                  },
-                  {default: () => v.title}),
-              h(NButtonGroup,
-                  {
-                    size: "tiny",
-                  },
-                  {
-                    default: () => [
-                      h(NButton, {
-                        round: true,
-                        disabled: idx === 0 || !v.sortable || !dataColumns.value[idx-1].sortable,
-                        focusable: false,
-                        onClick: () => v.sortUp(idx),
-                      }, {
-                        default: () => h(NIcon, {component: CaretUp16Filled})
-                      }),
-                      h(NButton, {
-                        round: true,
-                        disabled: idx === dataColumns.value.length - 1 || !v.sortable || !dataColumns.value[idx+1].sortable,
-                        focusable: false,
-                        onClick: () => v.sortDown(idx),
-                      }, {
-                        default: () => h(NIcon, {component: CaretDown16Filled})
-                      })
-                    ]
+        NFlex,
+        {
+          justify: "space-between",
+          style: { padding: "3px 15px" },
+        },
+        {
+          default: () => [
+            h(NCheckbox,
+              {
+                checked: v.fixed || v.show,
+                disabled: v.fixed ? true : false,
+                onUpdateChecked: (b) => v.show = b,
+                style: { padding: "3px 15px" }
+              },
+              { default: () => v.title }),
+            h(NButtonGroup,
+              {
+                size: "tiny",
+              },
+              {
+                default: () => [
+                  h(NButton, {
+                    round: true,
+                    disabled: v.checkUp(idx),
+                    focusable: false,
+                    onClick: () => v.sortUp(idx),
+                  }, {
+                    default: () => h(NIcon, { component: CaretUp16Filled })
                   }),
-            ]
-          }
+                  h(NButton, {
+                    round: true,
+                    disabled: v.checkDown(idx),
+                    focusable: false,
+                    onClick: () => v.sortDown(idx),
+                  }, {
+                    default: () => h(NIcon, { component: CaretDown16Filled })
+                  })
+                ]
+              }),
+          ]
+        }
       )
     }
   }));
@@ -452,49 +457,49 @@ const rowProps = (_: RowData) => {
 }
 
 const parentColumns = computed(() => {
-    return ([
-      {
-        type: "expand",
-        title: () => h(
-            NDropdown,
+  return ([
+    {
+      type: "expand",
+      title: () => h(
+        NDropdown,
+        {
+          trigger: "click",
+          placement: "bottom-start",
+          options: headerColumnOptions.value,
+        },
+        {
+          default: () => h(
+            NButton,
             {
-              trigger: "click",
-              placement: "bottom-start",
-              options: headerColumnOptions.value,
+              text: true,
+              style: { fontSize: '24px' }
             },
             {
-              default: ()=> h(
-                  NButton,
-                  {
-                    text: true,
-                    style: {fontSize: '24px'}
-                  },
-                  {
-                    default: () => h(
-                        NIcon,
-                        {component: TextColumnOne20Filled}
-                    )
-                  }
+              default: () => h(
+                NIcon,
+                { component: TextColumnOne20Filled }
               )
             }
-        ),
-        renderExpand: (row: RowData) => h(
-            NDataTable,
-            {
-              columns: (displayedColumns.value as DataTableColumns<RowData>),
-              rowKey: (row) => row.rowKey,
-              striped: true,
-              data: row.group!,
-              virtualScroll: true,
-              minRowHeight: 30,
-              maxHeight: 200,
-              summary: investorDurationSummary,
-              summaryPlacement: "top",
-              size: "small",
-            },
-        )
-      },
-    ] as DataTableColumns<RowData>).concat(displayedColumns.value as DataTableColumns<RowData>);
+          )
+        }
+      ),
+      renderExpand: (row: RowData) => h(
+        NDataTable,
+        {
+          columns: (displayedColumns.value as DataTableColumns<RowData>),
+          rowKey: (v) => v.rowKey,
+          striped: true,
+          data: row.group!,
+          virtualScroll: true,
+          minRowHeight: 30,
+          maxHeight: 200,
+          summary: investorDurationSummary,
+          summaryPlacement: "top",
+          size: "small",
+        },
+      )
+    },
+  ] as DataTableColumns<RowData>).concat(displayedColumns.value as DataTableColumns<RowData>);
 });
 
 const groupedData = computed(() => {
@@ -502,21 +507,21 @@ const groupedData = computed(() => {
 
   if (!exportAll.value) {
     return [...data.reduce(
-        (result: Map<string, AccountProxy>, curr: DBAccount) => {
-          const idt = [curr.broker_id, curr.account_id].join(".");
+      (result: Map<string, RowData>, curr: DBAccount) => {
+        const idt = [curr.broker_id, curr.account_id].join(".");
 
-          let data = result.get(idt);
+        let data = result.get(idt);
 
-          if (!data) {
-            data = new AccountProxy(curr);
-          }
-          data.group.push(curr);
+        if (!data) {
+          data = defineAccount(curr as unknown as RowData);
+        }
+        data.group.push(defineAccount(curr as unknown as RowData));
 
-          result.set(idt, data);
+        result.set(idt, data);
 
-          return result;
-        },
-        new Map([]),
+        return result;
+      },
+      new Map([]),
     ).values()];
   } else {
     return data;
@@ -524,7 +529,7 @@ const groupedData = computed(() => {
 })
 
 const dt = ref<DataTableInst>();
-const contextMenu = ref<{x: number; y: number; show: boolean}>({x: 0, y: 0, show: false});
+const contextMenu = ref<{ x: number; y: number; show: boolean }>({ x: 0, y: 0, show: false });
 
 function handleMenuSelect(sel: string) {
   contextMenu.value.show = false;
@@ -534,7 +539,7 @@ function handleMenuSelect(sel: string) {
   switch (sel) {
     case "all": {
       exportAll.value = true;
-      nextTick().then(()=>{
+      nextTick().then(() => {
         dt.value?.downloadCsv({
           fileName: `account_all_${now}.csv`,
         });
@@ -543,7 +548,7 @@ function handleMenuSelect(sel: string) {
       break;
     }
     case "page": {
-      nextTick().then(()=>{
+      nextTick().then(() => {
         dt.value?.downloadCsv({
           fileName: `account_current_${now}.csv`,
         });
@@ -560,413 +565,403 @@ function handleMenuSelect(sel: string) {
 
 function calcSummary(data: RowData[], key: string): Map<string, number> {
   return data.reduce(
-      (pre, curr) => pre.set(curr.currency_id, (pre.get(curr.currency_id) || 0) + curr[key]),
-      new Map<string, number>([])
+    (pre, curr) => pre.set(curr.currency_id, (pre.get(curr.currency_id) || 0) + (curr[key] as number)),
+    new Map<string, number>([])
   );
 }
 
 const summaryCell = defineComponent({});
 
 const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData[] => {
-    const lastDay = dayjs(pageData[0].trading_day);
-    const firstDay = dayjs(pageData[pageData.length-1].trading_day);
-    const diffMonth = lastDay.diff(firstDay, "month") + 1;
+  const lastDay = dayjs(pageData[0].trading_day);
+  const firstDay = dayjs(pageData[pageData.length - 1].trading_day);
+  const diffMonth = lastDay.diff(firstDay, "month") + 1;
 
-    const monthSummary = new Array<SummaryRowData>(diffMonth);
+  const monthSummary = new Array<SummaryRowData>(diffMonth);
 
-    for (let idx=0; idx < diffMonth; idx++) {
-      const month = firstDay.add(idx, "month").format("YYYYMM");
+  for (let idx = 0; idx < diffMonth; idx++) {
+    const month = firstDay.add(idx, "month").format("YYYYMM");
 
-      const monthData = pageData.filter(
-          (v) => { return v.trading_day.startsWith(month); }
-      );
+    const monthData = pageData.filter(
+      (v) => { return v.trading_day.startsWith(month); }
+    );
 
-      monthSummary[idx] = {
-        "account_id": {
-          value: h(NFlex, {
-            justify: "end",
-            class: "summary",
-          }, {
-            default: ()=> `${month} 月度汇总：`,
+    monthSummary[idx] = {
+      "account_id": {
+        value: h(NFlex, {
+          justify: "end",
+          class: "summary",
+        }, {
+          default: () => `${month} 月度汇总：`,
+        }),
+        colSpan: 3,
+      },
+      "deposit": {
+        value: h(NFlex, {
+          vertical: true,
+          style: { fontColor: "red" },
+        }, {
+          default: () => [...monthData.reduce(
+            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.deposit),
+            new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
           }),
-          colSpan: 3,
-        },
-        "deposit": {
-          value: h(NFlex, {
-            vertical: true,
-            style: {fontColor: "red"},
-          }, {
-            default: () => [...monthData.reduce(
-                (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.deposit),
-                new Map<string, number>([]),
-              ).entries()].map(([currency_id, value]) => {
-                return h("span", CurrencyFmt[currency_id](value));
-              }),
-          }),
-        },
-        "withdraw": {
-          value: h(NFlex, {
-            vertical: true,
-            style: {fontColor: "green"},
-          }, {
-            default: () => [...monthData.reduce(
-                (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.withdraw),
-                new Map<string, number>([]),
-            ).entries()].map(([currency_id, value]) => {
-              return h("span", CurrencyFmt[currency_id](value));
-            })
-          }),
-        },
-        'position_profit': {
-          value: h(NFlex, {vertical: true}, {
-            default: () => [...monthData.reduce(
-                (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.position_profit),
-                new Map<string, number>([]),
-            ).entries()].map(([currency_id, value]) => {
-              return h("span", CurrencyFmt[currency_id](value));
-            })
-          }),
-        },
-        'close_profit': {
-          value: h(NFlex, {vertical: true}, {
-            default: () => [...monthData.reduce(
-                (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.close_profit),
-                new Map<string, number>([]),
-            ).entries()].map(([currency_id, value]) => {
-              return h("span", CurrencyFmt[currency_id](value));
-            })
-          }),
-        },
-        'fee': {
-          value: h(NFlex, {vertical: true}, {
-            default: () => [...monthData.reduce(
-                (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.fee),
-                new Map<string, number>([]),
-            ).entries()].map(([currency_id, value]) => {
-              return h("span", CurrencyFmt[currency_id](value));
-            })
-          }),
-        },
-        'net_profit': {
-          value: h(NFlex, {vertical: true}, {
-            default: () => [...monthData.reduce(
-                (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.net_profit),
-                new Map<string, number>([]),
-            ).entries()].map(([currency_id, value]) => {
-              return h("span", CurrencyFmt[currency_id](value));
-            })
-          }),
-        },
-      }
+        }),
+      },
+      "withdraw": {
+        value: h(NFlex, {
+          vertical: true,
+          style: { fontColor: "green" },
+        }, {
+          default: () => [...monthData.reduce(
+            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.withdraw),
+            new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
+      },
+      'position_profit': {
+        value: h(NFlex, { vertical: true }, {
+          default: () => [...monthData.reduce(
+            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.position_profit),
+            new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
+      },
+      'close_profit': {
+        value: h(NFlex, { vertical: true }, {
+          default: () => [...monthData.reduce(
+            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.close_profit),
+            new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
+      },
+      'fee': {
+        value: h(NFlex, { vertical: true }, {
+          default: () => [...monthData.reduce(
+            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.fee),
+            new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
+      },
+      'net_profit': {
+        value: h(NFlex, { vertical: true }, {
+          default: () => [...monthData.reduce(
+            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.net_profit),
+            new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
+      },
     }
+  }
 
-    return monthSummary;
+  return monthSummary;
 }
 
 const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData | SummaryRowData[] => {
-    const lastDay = dayjs(
-        pageData[0].group![0].trading_day
+  const lastDay = dayjs(
+    pageData[0].group![0].trading_day
+  );
+  const firstDay = dayjs(
+    pageData[pageData.length - 1]
+      .group![pageData[pageData.length - 1].group!.length - 1]
+      .trading_day
+  );
+
+  const diffMonth = lastDay.diff(firstDay, "month") + 1;
+
+  const monthSummary = new Array<SummaryRowData>(diffMonth);
+
+  for (let idx = 0; idx < diffMonth; idx++) {
+    const month = firstDay.add(idx, "month").format("YYYYMM");
+
+    const monthData: DBAccount[] = pageData.reduce(
+      (pre, curr) => {
+        return pre.concat((curr.group || [] as DBAccount[]).filter(
+          (v) => { return v.trading_day.startsWith(month); }
+        ));
+      }, [] as DBAccount[]
     );
-    const firstDay = dayjs(
-        pageData[pageData.length-1]
-            .group![pageData[pageData.length-1].group!.length-1]
-            .trading_day
-    );
 
-    const diffMonth = lastDay.diff(firstDay, "month") + 1;
-
-    const monthSummary = new Array<SummaryRowData>(diffMonth);
-
-    for (let idx = 0; idx < diffMonth; idx++) {
-        const month = firstDay.add(idx, "month").format("YYYYMM");
-
-        const monthData: DBAccount[] = pageData.reduce(
-            (pre, curr) => {
-              return pre.concat((curr.group || [] as DBAccount[]).filter(
-                  (v) => { return v.trading_day.startsWith(month); }
-              ));
-            }, [] as DBAccount[]
-        );
-
-        monthSummary[idx] = {
-          'account_id': {
-            value: h(NFlex, {justify: "end"}, {default: ()=> `${month} 月度汇总：`}),
-            colSpan: 3,
-          },
-          "deposit": {
-            value: h(NFlex, {
-              vertical: true,
-              style: {fontColor: "red"},
-            }, {
-              default: () => [...monthData.reduce(
-                  (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.deposit),
-                  new Map<string, number>([]),
-              ).entries()].map(([currency_id, value]) => {
-                return h("span", CurrencyFmt[currency_id](value));
-              })
-            }),
-          },
-          "withdraw": {
-            value: h(NFlex, {
-              vertical: true,
-              style: {fontColor: "green"},
-            }, {
-              default: () => [...monthData.reduce(
-                  (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.withdraw),
-                  new Map<string, number>([]),
-              ).entries()].map(([currency_id, value]) => {
-                return h("span", CurrencyFmt[currency_id](value));
-              })
-            }),
-          },
-          'position_profit': {
-            value: h(NFlex, {vertical: true}, {
-              default: () => [...monthData.reduce(
-                  (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.position_profit),
-                  new Map<string, number>([]),
-              ).entries()].map(([currency_id, value]) => {
-                return h("span", CurrencyFmt[currency_id](value));
-              })
-            }),
-          },
-          'close_profit': {
-            value: h(NFlex, {vertical: true}, {
-              default: () => [...monthData.reduce(
-                  (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.close_profit),
-                  new Map<string, number>([]),
-              ).entries()].map(([currency_id, value]) => {
-                return h("span", CurrencyFmt[currency_id](value));
-              })
-            }),
-          },
-          'fee': {
-            value: h(NFlex, {vertical: true}, {
-              default: () => [...monthData.reduce(
-                  (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.fee),
-                  new Map<string, number>([]),
-              ).entries()].map(([currency_id, value]) => {
-                return h("span", CurrencyFmt[currency_id](value));
-              })
-            }),
-          },
-          'net_profit': {
-            value: h(NFlex, {vertical: true}, {
-              default: () => [...monthData.reduce(
-                  (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.net_profit),
-                  new Map<string, number>([]),
-              ).entries()].map(([currency_id, value]) => {
-                return h("span", CurrencyFmt[currency_id](value));
-              })
-            }),
-          },
-        }
+    monthSummary[idx] = {
+      'account_id': {
+        value: h(NFlex, { justify: "end" }, { default: () => `${month} 月度汇总：` }),
+        colSpan: 3,
+      },
+      "deposit": {
+        value: h(NFlex, {
+          vertical: true,
+          style: { fontColor: "red" },
+        }, {
+          default: () => [...monthData.reduce(
+            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.deposit),
+            new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
+      },
+      "withdraw": {
+        value: h(NFlex, {
+          vertical: true,
+          style: { fontColor: "green" },
+        }, {
+          default: () => [...monthData.reduce(
+            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.withdraw),
+            new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
+      },
+      'position_profit': {
+        value: h(NFlex, { vertical: true }, {
+          default: () => [...monthData.reduce(
+            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.position_profit),
+            new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
+      },
+      'close_profit': {
+        value: h(NFlex, { vertical: true }, {
+          default: () => [...monthData.reduce(
+            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.close_profit),
+            new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
+      },
+      'fee': {
+        value: h(NFlex, { vertical: true }, {
+          default: () => [...monthData.reduce(
+            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.fee),
+            new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
+      },
+      'net_profit': {
+        value: h(NFlex, { vertical: true }, {
+          default: () => [...monthData.reduce(
+            (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.net_profit),
+            new Map<string, number>([]),
+          ).entries()].map(([currency_id, value]) => {
+            return h("span", CurrencyFmt[currency_id](value));
+          })
+        }),
+      },
     }
+  }
 
-    return monthSummary.concat([{
-      'account_id': {
-        value: h(NFlex, {
-          justify: "end",
-          class: "summary",
-        }, {
-          default: ()=> "当前交易日汇总："
-        }),
-        colSpan: 3,
-      },
-      'pre_balance': {
-        value: h(NFlex, {
-          class: "summary",
-          vertical: true,
-        }, {
-          default: () => [...pageData.reduce(
-              (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.pre_balance),
-              new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) =>{
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
-      },
-      'deposit': {
-        value: h(NFlex, {
-          class: "summary",
-          vertical: true,
-        }, {
-          default: () => [...pageData.reduce(
-              (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.deposit),
-              new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
-      },
-      'withdraw': {
-        value: h(NFlex, {
-          class: "summary",
-          vertical: true,
-        }, {
-          default: () => [...pageData.reduce(
-              (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.withdraw),
-              new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
-      },
-      'balance': {
-        value: h(NFlex, {
-          class: "summary",
-          vertical: true,
-        }, {
-          default: () => [...pageData.reduce(
-              (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.balance),
-              new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
-      },
-      'position_profit': {
-        value: h(NFlex, {
-          class: "summary",
-          vertical: true,
-        }, {
-          default: () => [...pageData.reduce(
-              (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.position_profit),
-              new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
-      },
-      'close_profit': {
-        value: h(NFlex, {
-          class: "summary",
-          vertical: true,
-        }, {
-          default: () => [...pageData.reduce(
-              (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.close_profit),
-              new Map<string, number>([]),
-          ).entries()].map(([currency_id, value]) => {
-            return h("span", CurrencyFmt[currency_id](value));
-          })
-        }),
-      },
-      'fee': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.fee,
-            0,
-        ))),
-      },
-      'net_profit': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.net_profit,
-            0,
-        ))),
-      },
-    }, {
-      'account_id': {
-        value: h(NFlex, {
-          justify: "end",
-          class: "summary",
-        }, {
-          default: ()=> "截止最后交易日汇总："
-        }),
-        colSpan: 3,
-      },
-      'pre_balance': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.pre_balance,
-            0,
-        ))),
-      },
-      'deposit': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + (row.group || []).reduce(
-                (pre, curr) => pre + curr.deposit,
-                0
-            ),
-            0,
-        ))),
-      },
-      'withdraw': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + (row.group || []).reduce(
-                (pre, curr) => pre + curr.withdraw,
-                0
-            ),
-            0,
-        ))),
-      },
-      'balance': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + row.balance,
-            0,
-        ))),
-      },
-      'position_profit': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + (row.group || []).reduce(
-                (pre, curr) => pre + curr.position_profit,
-                0
-            ),
-            0,
-        ))),
-      },
-      'close_profit': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + (row.group || []).reduce(
-                (pre, curr) => pre + curr.close_profit,
-                0
-            ),
-            0,
-        ))),
-      },
-      'fee': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + (row.group || []).reduce(
-                (pre, curr) => pre + curr.fee,
-                0
-            ),
-            0,
-        ))),
-      },
-      'net_profit': {
-        value: h('span', {class: "summary",}, CNY(pageData.reduce(
-            (pre, row) => pre + (row.group || []).reduce(
-                (pre, curr) => pre + curr.net_profit,
-                0
-            ),
-            0,
-        ))),
-      },
-    }]);
+  return monthSummary.concat([{
+    'account_id': {
+      value: h(NFlex, {
+        justify: "end",
+        class: "summary",
+      }, {
+        default: () => "当前交易日汇总："
+      }),
+      colSpan: 3,
+    },
+    'pre_balance': {
+      value: h(NFlex, {
+        class: "summary",
+        vertical: true,
+      }, {
+        default: () => [...pageData.reduce(
+          (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.pre_balance),
+          new Map<string, number>([]),
+        ).entries()].map(([currency_id, value]) => {
+          return h("span", CurrencyFmt[currency_id](value));
+        })
+      }),
+    },
+    'deposit': {
+      value: h(NFlex, {
+        class: "summary",
+        vertical: true,
+      }, {
+        default: () => [...pageData.reduce(
+          (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.deposit),
+          new Map<string, number>([]),
+        ).entries()].map(([currency_id, value]) => {
+          return h("span", CurrencyFmt[currency_id](value));
+        })
+      }),
+    },
+    'withdraw': {
+      value: h(NFlex, {
+        class: "summary",
+        vertical: true,
+      }, {
+        default: () => [...pageData.reduce(
+          (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.withdraw),
+          new Map<string, number>([]),
+        ).entries()].map(([currency_id, value]) => {
+          return h("span", CurrencyFmt[currency_id](value));
+        })
+      }),
+    },
+    'balance': {
+      value: h(NFlex, {
+        class: "summary",
+        vertical: true,
+      }, {
+        default: () => [...pageData.reduce(
+          (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.balance),
+          new Map<string, number>([]),
+        ).entries()].map(([currency_id, value]) => {
+          return h("span", CurrencyFmt[currency_id](value));
+        })
+      }),
+    },
+    'position_profit': {
+      value: h(NFlex, {
+        class: "summary",
+        vertical: true,
+      }, {
+        default: () => [...pageData.reduce(
+          (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.position_profit),
+          new Map<string, number>([]),
+        ).entries()].map(([currency_id, value]) => {
+          return h("span", CurrencyFmt[currency_id](value));
+        })
+      }),
+    },
+    'close_profit': {
+      value: h(NFlex, {
+        class: "summary",
+        vertical: true,
+      }, {
+        default: () => [...pageData.reduce(
+          (pre, row) => pre.set(row.currency_id, (pre.get(row.currency_id) || 0) + row.close_profit),
+          new Map<string, number>([]),
+        ).entries()].map(([currency_id, value]) => {
+          return h("span", CurrencyFmt[currency_id](value));
+        })
+      }),
+    },
+    'fee': {
+      value: h('span', { class: "summary", }, CNY(pageData.reduce(
+        (pre, row) => pre + row.fee,
+        0,
+      ))),
+    },
+    'net_profit': {
+      value: h('span', { class: "summary", }, CNY(pageData.reduce(
+        (pre, row) => pre + row.net_profit,
+        0,
+      ))),
+    },
+  }, {
+    'account_id': {
+      value: h(NFlex, {
+        justify: "end",
+        class: "summary",
+      }, {
+        default: () => "截止最后交易日汇总："
+      }),
+      colSpan: 3,
+    },
+    'pre_balance': {
+      value: h('span', { class: "summary", }, CNY(pageData.reduce(
+        (pre, row) => pre + row.pre_balance,
+        0,
+      ))),
+    },
+    'deposit': {
+      value: h('span', { class: "summary", }, CNY(pageData.reduce(
+        (pre, row) => pre + (row.group || []).reduce(
+          (pre, curr) => pre + curr.deposit,
+          0
+        ),
+        0,
+      ))),
+    },
+    'withdraw': {
+      value: h('span', { class: "summary", }, CNY(pageData.reduce(
+        (pre, row) => pre + (row.group || []).reduce(
+          (pre, curr) => pre + curr.withdraw,
+          0
+        ),
+        0,
+      ))),
+    },
+    'balance': {
+      value: h('span', { class: "summary", }, CNY(pageData.reduce(
+        (pre, row) => pre + row.balance,
+        0,
+      ))),
+    },
+    'position_profit': {
+      value: h('span', { class: "summary", }, CNY(pageData.reduce(
+        (pre, row) => pre + (row.group || []).reduce(
+          (pre, curr) => pre + curr.position_profit,
+          0
+        ),
+        0,
+      ))),
+    },
+    'close_profit': {
+      value: h('span', { class: "summary", }, CNY(pageData.reduce(
+        (pre, row) => pre + (row.group || []).reduce(
+          (pre, curr) => pre + curr.close_profit,
+          0
+        ),
+        0,
+      ))),
+    },
+    'fee': {
+      value: h('span', { class: "summary", }, CNY(pageData.reduce(
+        (pre, row) => pre + (row.group || []).reduce(
+          (pre, curr) => pre + curr.fee,
+          0
+        ),
+        0,
+      ))),
+    },
+    'net_profit': {
+      value: h('span', { class: "summary", }, CNY(pageData.reduce(
+        (pre, row) => pre + (row.group || []).reduce(
+          (pre, curr) => pre + curr.net_profit,
+          0
+        ),
+        0,
+      ))),
+    },
+  }]);
 }
 </script>
 
 <template>
-  <n-watermark :content="watermark"
-               :font-size="16"
-               :line-height="16"
-               :width="192"
-               :height="128"
-               :x-offset="12"
-               :y-offset="28"
-               :rotate="-15"
-               cross selectable v-if="showWaterMark && watermark">
+  <n-watermark :content="watermark" :font-size="16" :line-height="16" :width="192" :height="128" :x-offset="12"
+    :y-offset="28" :rotate="-15" cross selectable v-if="showWaterMark && watermark">
     <n-data-table ref="dt" :columns="parentColumns as DataTableColumns<RowData>" :data="groupedData" :loading="loading"
-                  :row-key="(row) => row.rowKey" :row-props="rowProps"
-                  :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
-                  striped >
+      :row-key="(row) => row.rowKey" :row-props="rowProps"
+      :summary="groupedData && groupedData.length > 0 ? groupDurationSummary : undefined" striped>
     </n-data-table>
   </n-watermark>
   <n-data-table ref="dt" :columns="parentColumns as DataTableColumns<RowData>" :data="groupedData" :loading="loading"
-                :row-key="(row) => row.rowKey" :row-props="rowProps"
-                :max-height="maxHeight"
-                :summary="groupedData && groupedData.length > 0? groupDurationSummary : undefined"
-                striped v-else>
+    :row-key="(row) => row.rowKey" :row-props="rowProps" :max-height="maxHeight"
+    :summary="groupedData && groupedData.length > 0 ? groupDurationSummary : undefined" striped v-else>
   </n-data-table>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
-              :on-clickoutside="() => contextMenu.show = false" @select="handleMenuSelect"
-              :options="[{label: '导出当前', key: 'page'}, {label: '导出全部', key: 'all'}, ]" ></n-dropdown>
+    :on-clickoutside="() => contextMenu.show = false" @select="handleMenuSelect"
+    :options="[{ label: '导出当前', key: 'page' }, { label: '导出全部', key: 'all' },]"></n-dropdown>
 </template>
 
 <style scoped>
