@@ -129,6 +129,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     title: "资金账号",
     key: "account_id",
     fixed: "left",
+    sortable: false,
     width: 100,
     titleAlign: "center"
   }),
@@ -136,6 +137,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     title: "账号名称",
     key: "account_name",
     fixed: "left",
+    sortable: false,
     width: 100,
     titleAlign: "center",
   }),
@@ -143,6 +145,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     title: "交易日",
     key: "trading_day",
     fixed: "left",
+    sortable: false,
     width: 100,
     titleAlign: "center",
   }),
@@ -150,6 +153,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     title: "昨权益",
     key: "pre_balance",
     show: true,
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -164,6 +168,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     title: "入金",
     key: "deposit",
     show: true,
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -178,6 +183,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     title: "出金",
     key: "withdraw",
     show: true,
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -192,6 +198,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     title: "今权益",
     key: "balance",
     show: true,
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -205,6 +212,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
   new ColumnDefineProxy({
     title: "冻结权益",
     key: "frozen_balance",
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -218,6 +226,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
   new ColumnDefineProxy({
     title: "可用",
     key: "available",
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -231,6 +240,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
   new ColumnDefineProxy({
     title: "保证金",
     key: "margin",
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -244,6 +254,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
   new ColumnDefineProxy({
     title: "冻结保证金",
     key: "frozen_margin",
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -258,6 +269,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     title: "持仓盈亏",
     key: "position_profit",
     show: true,
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -272,6 +284,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     title: "平仓盈亏",
     key: "close_profit",
     show: true,
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -286,6 +299,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     title: "手续费",
     key: "fee",
     show: true,
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -299,6 +313,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
   new ColumnDefineProxy({
     title: "冻结手续费",
     key: "frozen_fee",
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -313,6 +328,7 @@ const dataColumns = ref<Array<ColumnDefine>>([
     title: "净盈亏",
     key: "net_profit",
     show: true,
+    sortable: true,
     titleAlign: "center",
     align: "right",
     render(row) {
@@ -327,13 +343,14 @@ const dataColumns = ref<Array<ColumnDefine>>([
     title: "币种",
     key: "currency_id",
     fixed: "right",
+    sortable: false,
     width: 60,
     titleAlign: "center",
     align: "right",
   }),
 ])
 
-const defaultColumns = computed((): DataTableColumns<RowData> => {
+const displayedColumns = computed((): DataTableColumns<RowData> => {
   return dataColumns.value.filter(
       (v) => v.fixed || v.show
   );
@@ -464,7 +481,7 @@ const parentColumns = computed(() => {
         renderExpand: (row: RowData) => h(
             NDataTable,
             {
-              columns: (defaultColumns.value as DataTableColumns<RowData>),
+              columns: (displayedColumns.value as DataTableColumns<RowData>),
               rowKey: (row) => row.rowKey,
               striped: true,
               data: row.group!,
@@ -477,7 +494,7 @@ const parentColumns = computed(() => {
             },
         )
       },
-    ] as DataTableColumns<RowData>).concat(defaultColumns.value as DataTableColumns<RowData>);
+    ] as DataTableColumns<RowData>).concat(displayedColumns.value as DataTableColumns<RowData>);
 });
 
 const groupedData = computed(() => {
