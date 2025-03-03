@@ -626,7 +626,12 @@ function makeSummaryCell(data: RowData[], key: SummaryKeys, deep: boolean = fals
     vertical: true,
   }, {
     default: () => [...calcSummary(data, key, deep).entries()].map(([currency_id, value]) => {
-      return h(NEllipsis, CurrencyFmt[currency_id](value));
+      return h(
+          NEllipsis, {},
+          {
+            default: () => CurrencyFmt[currency_id](value),
+          }
+      );
     }),
   });
 }
