@@ -102,14 +102,14 @@ onMounted(() => {
           title: "法定节假日查询完成",
           description: `已获取 [${startYear} ~ ${lastYear}] ${yearVacations.length}年节假日信息`,
           content: () => h(
-              NFlex, {vertical: true},
+              NFlex, {},
               {
-                default: () => yearVacations.map(
+                default: () => [...yearVacations.map(
                     ([year, vacations]) => h(
                         "span",
-                        `${year} 年共计 ${vacations.reduce((pre, curr) => pre + curr.range.length, 0)} 个法定节假日`
+                        `${year}年: ${vacations.reduce((pre, curr) => pre + curr.range.length, 0)}天`
                     )
-                )
+                )]
               }
           ),
           meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),

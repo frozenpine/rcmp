@@ -11,8 +11,9 @@ import dayjs from "dayjs";
 import { TextColumnOne20Filled, CaretUp16Filled, CaretDown16Filled } from "@vicons/fluent";
 
 import { CurrencyFormatter } from "../utils/formatter.ts";
-import { useMessage } from "../utils/feedback.ts";
+import { useMessage, useNotification } from "../utils/feedback.ts";
 import { DBAccount } from "../models/db.ts";
+import { metaStore } from "../store/meta.ts";
 
 interface GroupAccountTableProps {
   loading?: boolean;
@@ -36,9 +37,10 @@ const CurrencyFmt: Formatter = {
   CNY: CurrencyFormatter(),
   USD: CurrencyFormatter('$'),
 }
-const CNY = CurrencyFormatter();
 
+const meta = metaStore();
 const message = useMessage();
+const notification = useNotification();
 
 const exportAll = ref(false);
 const showWaterMark = ref(false);
@@ -406,7 +408,7 @@ const headerColumnOptions = computed((): HeaderColumnOption[] => {
             h(NCheckbox,
               {
                 checked: v.fixed || v.show,
-                disabled: v.fixed ? true : false,
+                disabled: !!v.fixed,
                 onUpdateChecked: (b) => v.show = b,
                 style: { padding: "3px 15px" }
               },
@@ -502,11 +504,11 @@ const parentColumns = computed(() => {
   ] as DataTableColumns<RowData>).concat(displayedColumns.value as DataTableColumns<RowData>);
 });
 
-const groupedData = computed(() => {
+const groupedData = computed((): RowData[] => {
   if (!data || data.length < 1) return [];
 
   if (!exportAll.value) {
-    return [...data.reduce(
+    const results = [...data.reduce(
       (result: Map<string, RowData>, curr: DBAccount) => {
         const idt = [curr.broker_id, curr.account_id].join(".");
 
@@ -523,6 +525,42 @@ const groupedData = computed(() => {
       },
       new Map([]),
     ).values()];
+
+    results.forEach((row) => {
+      const last = row.group[0].trading_day;
+      const first = row.group[row.group.length-1].trading_day;
+
+      const dateCache = new Set(meta.getTradingDays(first, last).map((v) => v.format("YYYYMMDD")));
+      console.log("check date range:", row.identity, first, last, dateCache);
+      if (dateCache.size < 1) return;
+
+      row.group.forEach((v) => {
+        dateCache.delete(v.trading_day);
+      })
+
+      if (dateCache.size > 0) {
+        const values = [...dateCache].sort();
+
+        notification.warning({
+          title: "交易日检查异常",
+          description: `${row.account_name} (${row.account_id}) 缺失交易日数据`,
+          content: () => h(
+              NFlex, {},
+              {
+                default: () => [...values.map((d) => h(
+                    "span",
+                    `${d} 数据缺失`
+                ))]
+              }
+          ),
+          meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+          duration: 0,
+          closable: true,
+        })
+      }
+    })
+
+    return results
   } else {
     return data;
   }

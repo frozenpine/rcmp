@@ -79,10 +79,13 @@ export const fundStore = defineStore("fund", {
 
                     this.accounts.delete([broker_id, account_id].join("."))
 
+                    const start = startDate? dayjs(startDate) : undefined;
+                    const end = endDate? dayjs(endDate) : undefined
+
                     invoke("query_accounts", {
                         accounts: [[broker_id, account_id]],
-                        startDate: startDate? dayjs(startDate).format("YYYYMMDD") : undefined,
-                        endDate: endDate? dayjs(endDate).format("YYYYMMDD") : undefined,
+                        startDate: start?.format("YYYYMMDD"),
+                        endDate: end?.format("YYYYMMDD"),
                     }).then((values) => {
                         this.handlerAccounts(values as DBAccount[]);
                         resolve(values as DBAccount[]);
@@ -138,12 +141,15 @@ export const fundStore = defineStore("fund", {
                         this.accounts.delete(k)
                     })
 
+                    const start = startDate? dayjs(startDate) : undefined;
+                    const end = endDate? dayjs(endDate) : undefined
+
                     invoke("query_accounts", {
                         accounts: [...query_accounts].map((v) => {
                             return v.split(".", 2);
                         }),
-                        startDate: startDate? dayjs(startDate).format("YYYYMMDD") : undefined,
-                        endDate: endDate? dayjs(endDate).format("YYYYMMDD") : undefined,
+                        startDate: start?.format("YYYYMMDD"),
+                        endDate: end?.format("YYYYMMDD"),
                     }).then((values) => {
                         this.handlerAccounts(values as DBAccount[]);
 
