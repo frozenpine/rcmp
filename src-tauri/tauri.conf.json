@@ -25,7 +25,8 @@
           "identifier": "dialog",
           "windows": ["*"],
           "permissions": [
-            "dialog:allow-open"
+            "dialog:allow-open",
+            "dialog:allow-save"
           ]
         },
         {
