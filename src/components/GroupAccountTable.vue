@@ -6,10 +6,11 @@ import {
   NButton, NIcon, NCheckbox, NButtonGroup, NEllipsis,
 } from "naive-ui";
 import type { SummaryRowData, TableColumn } from "naive-ui/es/data-table/src/interface";
-import {h, nextTick, ref, computed} from "vue";
+import { h, nextTick, ref, computed } from "vue";
 import dayjs from "dayjs";
 import { TextColumnOne20Filled, CaretUp16Filled, CaretDown16Filled } from "@vicons/fluent";
 import ExcelJS from "exceljs";
+import type { Style } from "exceljs";
 import { saveAs } from "file-saver";
 
 import { CurrencyFormatter } from "../utils/formatter.ts";
@@ -77,6 +78,7 @@ interface ColumnDisplayDefine {
   key: string,
   show?: boolean,
   sortable: boolean,
+  numFmt?: string,
   summarySum?: boolean,
   summaryLast?: boolean,
 }
@@ -166,6 +168,7 @@ const dataColumns = ref([
     key: "pre_balance",
     show: true,
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summaryLast: true,
     titleAlign: "center",
     align: "right",
@@ -182,6 +185,7 @@ const dataColumns = ref([
     key: "deposit",
     show: true,
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summarySum: true,
     titleAlign: "center",
     align: "right",
@@ -198,6 +202,7 @@ const dataColumns = ref([
     key: "withdraw",
     show: true,
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summarySum: true,
     titleAlign: "center",
     align: "right",
@@ -214,6 +219,7 @@ const dataColumns = ref([
     key: "balance",
     show: true,
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summaryLast: true,
     titleAlign: "center",
     align: "right",
@@ -229,6 +235,7 @@ const dataColumns = ref([
     title: "冻结权益",
     key: "frozen_balance",
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summaryLast: true,
     titleAlign: "center",
     align: "right",
@@ -244,6 +251,7 @@ const dataColumns = ref([
     title: "可用",
     key: "available",
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summaryLast: true,
     titleAlign: "center",
     align: "right",
@@ -259,6 +267,7 @@ const dataColumns = ref([
     title: "保证金",
     key: "margin",
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summaryLast: true,
     titleAlign: "center",
     align: "right",
@@ -274,6 +283,7 @@ const dataColumns = ref([
     title: "冻结保证金",
     key: "frozen_margin",
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summaryLast: true,
     titleAlign: "center",
     align: "right",
@@ -290,6 +300,7 @@ const dataColumns = ref([
     key: "position_profit",
     show: true,
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summarySum: true,
     titleAlign: "center",
     align: "right",
@@ -306,6 +317,7 @@ const dataColumns = ref([
     key: "close_profit",
     show: true,
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summarySum: true,
     titleAlign: "center",
     align: "right",
@@ -322,6 +334,7 @@ const dataColumns = ref([
     key: "fee",
     show: true,
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summarySum: true,
     titleAlign: "center",
     align: "right",
@@ -337,6 +350,7 @@ const dataColumns = ref([
     title: "冻结手续费",
     key: "frozen_fee",
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summaryLast: true,
     titleAlign: "center",
     align: "right",
@@ -353,6 +367,7 @@ const dataColumns = ref([
     key: "net_profit",
     show: true,
     sortable: true,
+    numFmt: "￥* #,###0.00;￥* -#,###0.00",
     summarySum: true,
     titleAlign: "center",
     align: "right",
@@ -545,7 +560,7 @@ const groupedData = computed((): RowData[] => {
 
   results.forEach((row) => {
     const last = row.group[0].trading_day;
-    const first = row.group[row.group.length-1].trading_day;
+    const first = row.group[row.group.length - 1].trading_day;
 
     const dateCache = new Set(meta.getTradingDays(first, last)?.map((v) => v.format("YYYYMMDD")));
 
@@ -562,13 +577,13 @@ const groupedData = computed((): RowData[] => {
         title: "交易日检查异常",
         description: `${row.account_name} (${row.account_id}) 缺失交易日数据`,
         content: () => h(
-            NFlex, {},
-            {
-              default: () => [...values.map((d) => h(
-                  "span",
-                  `${d}-数据缺失`
-              ))]
-            }
+          NFlex, {},
+          {
+            default: () => [...values.map((d) => h(
+              "span",
+              `${d}-数据缺失`
+            ))]
+          }
         ),
         meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
         duration: 0,
@@ -592,11 +607,36 @@ function handleMenuSelect(sel: string) {
   let fileName: string = "";
 
   workSheet.columns = displayedColumns.value.map((col) => {
+    const define = col as unknown as ColumnDisplayDefine;
+
     return {
-      header: col.title,
-      key: col.key,
+      header: define.title,
+      key: define.key,
+      style: {
+        numFmt: define.numFmt ? define.numFmt : "",
+        alignment: { vertical: "middle" },
+      }
     }
   });
+
+  const summaryStyle: Partial<Style> = {
+    font: {
+      bold: true,
+    },
+    alignment: { vertical: "middle", horizontal: "right" },
+  }
+
+  workSheet.getRow(1).eachCell((cell) => {
+    cell.style = {
+      font: {
+        bold: true,
+      },
+      alignment: { vertical: "middle", horizontal: "center" },
+      border: {
+        bottom: { style: "thick" },
+      }
+    };
+  })
 
   switch (sel) {
     case "all": {
@@ -612,32 +652,44 @@ function handleMenuSelect(sel: string) {
           const month = firstDay.add(idx, "month").format("YYYYMM");
 
           const monthData = row.group.filter(
-              (v) => {
-                return v.trading_day.startsWith(month);
-              }
+            (v) => {
+              return v.trading_day.startsWith(month);
+            }
           );
 
           workSheet.addRows(monthData);
 
           const summary = [...displayedColumns.value.map(
-              (col) => {
-                const define = col as unknown as ColumnDisplayDefine;
+            (col) => {
+              const define = col as unknown as ColumnDisplayDefine;
 
-                if (define.summarySum) {
-                  // TODO: 如何兼容多币种数据
-                  return calcSummary(monthData, define.key as SummaryKeys).get("CNY");
-                }
-
-                if (define.key === "account_id") {
-                  return `${month} 月度汇总:`
-                }
-
-                return undefined;
+              if (define.summarySum) {
+                // TODO: 如何兼容多币种数据
+                return calcSummary(monthData, define.key as SummaryKeys).get("CNY");
               }
+
+              if (define.key === "account_id") {
+                return `${month} 月度汇总:`
+              }
+
+              return undefined;
+            }
           )]
 
-          console.log("investor monthly summary:", summary);
-          workSheet.addRow(summary);
+          const monthSummary = workSheet.addRow(summary);
+          monthSummary.getCell(1).style = {
+            font: {
+              bold: true,
+            },
+            alignment: { vertical: "middle", horizontal: "right" },
+          };
+          workSheet.mergeCells(`A${monthSummary.number}:C${monthSummary.number}`)
+
+          for (let i = 1; i <= workSheet.columns.length; i++) {
+            monthSummary.getCell(i).style.border = {
+              bottom: { style: 'thin' },
+            };
+          }
         }
       });
 
@@ -666,73 +718,82 @@ function handleMenuSelect(sel: string) {
     const month = firstDay.add(idx, "month").format("YYYYMM");
 
     const monthData = data!.filter(
-        (v) => v.trading_day.startsWith(month)
+      (v) => v.trading_day.startsWith(month)
     ) as unknown as RowData[];
 
     const summary = [...displayedColumns.value.map(
-        (col) => {
-          const define = col as unknown as ColumnDisplayDefine;
-
-          if (define.summarySum) {
-            // TODO: 如何兼容多币种数据
-            return calcSummary(monthData, define.key as SummaryKeys).get("CNY");
-          }
-
-          if (define.key === "account_id") {
-            return `${month} 月度汇总:`
-          }
-
-          return undefined;
-        }
-    )]
-
-    console.log("allover monthly summary:", summary);
-    workSheet.addRow(summary);
-  }
-
-  const todaySummary = [...displayedColumns.value.map(
-      (col) => {
-        const define = col as unknown as ColumnDisplayDefine;
-
-        if (define.summaryLast || define.summarySum) {
-          return calcSummary(groupedData.value, define.key as SummaryKeys).get("CNY");
-        }
-
-        if (define.key === "account_id") {
-          return "当前交易日汇总:"
-        }
-
-        return undefined;
-      }
-  )];
-  workSheet.addRow(todaySummary);
-
-  const allSummary = [...displayedColumns.value.map(
       (col) => {
         const define = col as unknown as ColumnDisplayDefine;
 
         if (define.summarySum) {
-          return calcSummary(data, define.key as SummaryKeys).get("CNY");
-        }
-
-        if (define.summaryLast) {
-          return calcSummary(groupedData.value, define.key as SummaryKeys).get("CNY");
+          // TODO: 如何兼容多币种数据
+          return calcSummary(monthData, define.key as SummaryKeys).get("CNY");
         }
 
         if (define.key === "account_id") {
-          return "截止最后交易日汇总:"
+          return `${month} 月度汇总:`
         }
 
         return undefined;
       }
+    )]
+
+    const monthSummary = workSheet.addRow(summary);
+    monthSummary.getCell(1).style = summaryStyle;
+    workSheet.mergeCells(`A${monthSummary.number}:C${monthSummary.number}`);
+  }
+
+  const todaySummary = [...displayedColumns.value.map(
+    (col) => {
+      const define = col as unknown as ColumnDisplayDefine;
+
+      if (define.summaryLast || define.summarySum) {
+        return calcSummary(groupedData.value, define.key as SummaryKeys).get("CNY");
+      }
+
+      if (define.key === "account_id") {
+        return "当前交易日汇总:"
+      }
+
+      return undefined;
+    }
   )];
-  workSheet.addRow(allSummary);
+  const todaySummaryRow = workSheet.addRow(todaySummary);
+  todaySummaryRow.getCell(1).style = summaryStyle;
+  workSheet.mergeCells(`A${todaySummaryRow.number}:C${todaySummaryRow.number}`);
+
+  const allSummary = [...displayedColumns.value.map(
+    (col) => {
+      const define = col as unknown as ColumnDisplayDefine;
+
+      if (define.summarySum) {
+        return calcSummary(data as unknown as RowData[], define.key as SummaryKeys).get("CNY");
+      }
+
+      if (define.summaryLast) {
+        return calcSummary(groupedData.value, define.key as SummaryKeys).get("CNY");
+      }
+
+      if (define.key === "account_id") {
+        return "截止最后交易日汇总:"
+      }
+
+      return undefined;
+    }
+  )];
+  const allSummaryRow = workSheet.addRow(allSummary);
+  allSummaryRow.getCell(1).style = summaryStyle;
+  workSheet.mergeCells(`A${allSummaryRow.number}:C${allSummaryRow.number}`);
+
+  workSheet.eachRow((row) => {
+    row.height = 30;
+  });
 
   workbook.xlsx.writeBuffer()
-      .then((buff)=> {
-        saveAs(new Blob([buff]), fileName);
-      })
-      .catch((e) => console.log("all data export failed:", e));
+    .then((buff) => {
+      saveAs(new Blob([buff]), fileName);
+    })
+    .catch((e) => console.log("all data export failed:", e));
 }
 
 type SummaryKeys = "pre_balance" | "frozen_balance" | "balance" | "available" |
@@ -761,10 +822,10 @@ function makeSummaryCell(data: RowData[], key: SummaryKeys, deep: boolean = fals
   }, {
     default: () => [...calcSummary(data, key, deep).entries()].map(([identity, value]) => {
       return h(
-          NEllipsis, {},
-          {
-            default: () => CurrencyFmt[identity](value as number),
-          }
+        NEllipsis, {},
+        {
+          default: () => CurrencyFmt[identity](value as number),
+        }
       );
     }),
   });
