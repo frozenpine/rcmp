@@ -214,6 +214,10 @@ pub fn run() {
         .plugin(tauri_plugin_sql::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_pinia::Builder::new()
+            .path("./data")
+            .autosave(std::time::Duration::from_secs(300))
+            .build())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .clear_targets()

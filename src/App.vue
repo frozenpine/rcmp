@@ -18,7 +18,7 @@ import Statistics from "./components/Statistics.vue";
 import {useNotification} from "./utils/feedback.ts";
 import type {InvestorLoaderInst} from "./components/interface";
 
-import { fundStore } from "./store/fund.ts";
+import {fundStore} from "./store/fund.ts";
 import {metaStore} from "./store/meta.ts";
 import {Vacation} from "./models/db.ts";
 import dayjs from "dayjs";
@@ -77,7 +77,7 @@ const contentHeight = computed(() => {
   return windowHeight.value - 370;
 })
 
-onMounted(() => {
+onMounted(async () => {
   windowHeight.value = window.innerHeight;
 
   const notification = useNotification();
@@ -131,7 +131,7 @@ onMounted(() => {
 
   window.addEventListener("resize", (evt) => {
     windowHeight.value = (evt.target! as any).innerHeight;
-  })
+  });
 })
 </script>
 

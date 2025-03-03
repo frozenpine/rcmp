@@ -6,7 +6,7 @@ import {
   NButton, NIcon, NCheckbox, NButtonGroup, NEllipsis,
 } from "naive-ui";
 import type { SummaryRowData, TableColumn } from "naive-ui/es/data-table/src/interface";
-import { h, nextTick, ref, computed } from "vue";
+import {h, nextTick, ref, computed} from "vue";
 import dayjs from "dayjs";
 import { TextColumnOne20Filled, CaretUp16Filled, CaretDown16Filled } from "@vicons/fluent";
 
@@ -39,6 +39,7 @@ const CurrencyFmt: Formatter = {
 }
 
 const meta = metaStore();
+let user: UserStore | undefined = undefined;
 const message = useMessage();
 const notification = useNotification();
 
@@ -51,10 +52,10 @@ interface RowData extends DBAccount {
   rowKey: string;
 }
 
-function defineAccount(acct: RowData) {
+function defineAccount(acct: DBAccount) {
   const group: RowData[] = [];
 
-  return new Proxy(acct, {
+  return new Proxy(acct as unknown as RowData, {
     get: (target, propKey) => {
       switch (propKey) {
         case "identity":
@@ -493,8 +494,7 @@ const parentColumns = computed(() => {
           striped: true,
           data: row.group!,
           virtualScroll: true,
-          minRowHeight: 30,
-          maxHeight: 200,
+          maxHeight: 300,
           summary: investorDurationSummary,
           summaryPlacement: "top",
           size: "small",
@@ -508,16 +508,16 @@ const groupedData = computed((): RowData[] => {
   if (!data || data.length < 1) return [];
 
   if (!exportAll.value) {
-    const results = [...data.reduce(
+    const results: RowData[] = [...data.reduce(
       (result: Map<string, RowData>, curr: DBAccount) => {
         const idt = [curr.broker_id, curr.account_id].join(".");
 
         let data = result.get(idt);
 
         if (!data) {
-          data = defineAccount(curr as unknown as RowData);
+          data = defineAccount(curr);
         }
-        data.group.push(defineAccount(curr as unknown as RowData));
+        data.group.push(defineAccount(curr));
 
         result.set(idt, data);
 
@@ -530,7 +530,7 @@ const groupedData = computed((): RowData[] => {
       const last = row.group[0].trading_day;
       const first = row.group[row.group.length-1].trading_day;
 
-      const dateCache = new Set(meta.getTradingDays(first, last).map((v) => v.format("YYYYMMDD")));
+      const dateCache = new Set(meta.getTradingDays(first, last)?.map((v) => v.format("YYYYMMDD")));
       console.log("check date range:", row.identity, first, last, dateCache);
       if (dateCache.size < 1) return;
 
@@ -549,7 +549,7 @@ const groupedData = computed((): RowData[] => {
               {
                 default: () => [...values.map((d) => h(
                     "span",
-                    `${d} 数据缺失`
+                    `${d}-数据缺失`
                 ))]
               }
           ),
@@ -562,7 +562,7 @@ const groupedData = computed((): RowData[] => {
 
     return results
   } else {
-    return data;
+    return data.map((v) => defineAccount(v));
   }
 })
 
