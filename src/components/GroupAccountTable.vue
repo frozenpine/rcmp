@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   type DataTableColumns, type DataTableCreateSummary,
-  type DropdownOption, type DropdownGroupOption,
+  type DropdownOption, type DropdownGroupOption, type DropdownMixedOption,
   NDataTable, NDropdown, NWatermark, NFlex, NSwitch,
   NButton, NIcon, NCheckbox, NButtonGroup, NEllipsis,
 } from "naive-ui";
@@ -595,7 +595,16 @@ const groupedData = computed((): RowData[] => {
   return results;
 })
 
-const contextMenu = ref<{ x: number; y: number; show: boolean }>({ x: 0, y: 0, show: false });
+const contextMenu = ref<{
+  x: number;
+  y: number;
+  show: boolean;
+  options: DropdownMixedOption[];
+}>({
+  x: 0, y: 0,
+  show: false,
+  options: [{ label: '导出最新数据', key: 'latest' }, { label: '导出全部数据', key: 'all' },]
+});
 
 function handleMenuSelect(sel: string) {
   contextMenu.value.show = false;
@@ -704,7 +713,8 @@ function handleMenuSelect(sel: string) {
     }
     default: {
       console.error("unsupported menu item:", sel);
-      message.error(`尚未支持【${sel}】该菜单选项`);
+      const options = contextMenu.options.filter((v) => v.key === sel);
+      message.error(`尚未支持【${options.length > 0 ? options[0].label : sel}】该菜单选项`);
       return;
     }
   }
@@ -1016,7 +1026,7 @@ const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): Summar
   </n-data-table>
   <n-dropdown placement="bottom-start" trigger="manual" :x="contextMenu.x" :y="contextMenu.y" :show="contextMenu.show"
     :on-clickoutside="() => contextMenu.show = false" @select="handleMenuSelect"
-    :options="[{ label: '导出最新数据', key: 'latest' }, { label: '导出全部数据', key: 'all' },]"></n-dropdown>
+    :options="contextMenu.options"></n-dropdown>
 </template>
 
 <style scoped>
