@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import {computed, ref, /*h,*/ nextTick} from "vue";
-import {NTransfer, NCard, NSpace, NButton/*, NInput*/} from "naive-ui";
-import type {TransferOption/*, TransferRenderTargetLabel*/ } from "naive-ui"
+import {computed, ref, nextTick} from "vue";
+import {NTransfer, NCard, NFlex, NButton} from "naive-ui";
+import type {TransferOption} from "naive-ui"
 
 import {metaStore} from "../store/meta.ts"
 import {DBInvestor} from "../models/db.ts";
@@ -105,9 +105,9 @@ function investorsCommit() {
                 source-filterable target-filterable virtual-scroll>
     </n-transfer>
     <template #action>
-      <n-space justify="end">
+      <n-flex justify="end">
         <n-button @click="investorsCommit" :loading="updating">确定</n-button>
-      </n-space>
+      </n-flex>
     </template>
   </n-card>
 </template>

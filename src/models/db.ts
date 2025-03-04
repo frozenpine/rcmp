@@ -21,6 +21,7 @@ export interface DBAccount {
 }
 
 export interface DBGroup {
+    [index: string | symbol]: string | Date | DBInvestor[] | undefined;
     readonly group_name: string;
     readonly group_desc: string;
     readonly created_at?: Date
@@ -29,6 +30,7 @@ export interface DBGroup {
 }
 
 export interface DBInvestor {
+    [index: string | symbol]: string | Date | DBGroup[] | undefined;
     readonly broker_id: string;
     readonly investor_id: string;
     readonly investor_name: string;
@@ -41,9 +43,9 @@ export interface DBInvestor {
 }
 
 export interface Vacation {
-    readonly year:number,
+    readonly year: number,
     readonly name: string,
-    readonly start: string,
-    readonly end: string,
+    readonly start: number,
+    readonly end: number,
     readonly range: string[],
 }

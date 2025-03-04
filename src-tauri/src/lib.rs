@@ -95,7 +95,7 @@ async fn sink_tu_account_files(
 
 #[tauri::command]
 async fn query_accounts(
-    accounts: Vec<&str>,
+    accounts: Vec<(&str, &str)>,
     start_date: Option<&str>,
     end_date: Option<&str>,
     state: State<'_, Mutex<Config>>,
@@ -104,13 +104,30 @@ async fn query_accounts(
 
     match cfg._db.as_ref() {
         Some(db) => db
-            .query_accounts_range(&accounts, start_date, end_date)
+            .query_accounts(&accounts, start_date, end_date)
             .await
             .map_err(|e| {
                 log::error!("query accounts failed: {:?}", e);
                 "query accounts failed".to_string()
             }),
         None => Err("no database initialized.".into()),
+    }
+}
+
+#[tauri::command]
+async fn query_holidays(
+    state: State<'_, Mutex<Config>>,
+) -> Result<Vec<db::DBHoliday>, String> {
+    let cfg = state.lock().await;
+
+    match cfg._db.as_ref() {
+        Some(db) => db.query_holidays()
+            .await
+            .map_err(|e| {
+                log::error!("query holidays failed: {:?}", e);
+                "query holidays failed".to_string()
+            }),
+        None => Err("no database initialized.".into())
     }
 }
 
@@ -131,6 +148,9 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            let tauri_cfg = app.config();
+
+            log::info!("tauri config: {:?}", tauri_cfg);
             log::info!("using config file: config/config.toml");
 
             let resource_path = app
@@ -141,7 +161,7 @@ pub fn run() {
                     e
                 })?;
 
-            let cfg_file = std::fs::read_to_string(
+            let cfg_file = fs::read_to_string(
                 resource_path.clone()
             ).map_err(|e| {
                 log::error!("read config file failed: {:?}", e);
@@ -171,20 +191,17 @@ pub fn run() {
                 log::info!("create data base dir: {}", &cfg.data_base);
             }
 
-            let db = match tauri::async_runtime::block_on(db::create_db(
-                &cfg.data_base,
-                &cfg.sql_base,
+            let db = tauri::async_runtime::block_on(db::migrate_db(
+                &cfg.data_base, &cfg.sql_base,
+                tauri_cfg.version.clone().unwrap_or_default().as_str(),
                 &cfg.schemas
                     .iter()
                     .map(|v| v.as_str())
                     .collect::<Vec<&str>>(),
-            )) {
-                Ok(db) => db,
-                Err(e) => {
-                    log::error!("create db failed: {:?}", e);
-                    panic!("create db failed");
-                }
-            };
+            )).map_err(|e| {
+                log::error!("migrate db failed: {:?}", e);
+                e
+            }).expect("migrate db failed");
 
             cfg._db = Some(db);
 
@@ -197,6 +214,10 @@ pub fn run() {
         .plugin(tauri_plugin_sql::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_pinia::Builder::new()
+            .path("./data")
+            .autosave(std::time::Duration::from_secs(300))
+            .build())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .clear_targets()
@@ -226,6 +247,7 @@ pub fn run() {
             query_accounts,
             query_investors,
             mod_group_investors,
+            query_holidays,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

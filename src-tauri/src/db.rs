@@ -111,8 +111,19 @@ pub struct DBInvestor {
     pub groups: Option<Vec<DBInvestorGroup>>,
 }
 
+#[derive(Debug, Clone, Default, sqlx::FromRow, serde::Serialize, serde::Deserialize)]
+#[sqlx(default)]
+pub struct DBHoliday {
+    pub year: i32,
+    pub name: String,
+    pub start: i32,
+    pub end: i32,
+    #[sqlx(skip)]
+    pub range: Vec<String>,
+}
+
 #[derive(Debug, Clone)]
-pub struct Schema {
+struct Schema {
     name: String,
     dsn: String,
 }
@@ -139,10 +150,6 @@ lazy_static! {
 }
 
 impl DB {
-    pub async fn open(base_dir: &str, schemas: &[&str]) -> Result<Self, Box<dyn Error>> {
-        open_db(base_dir, schemas).await
-    }
-
     pub async fn sink_accounts<T: AccountInfo>(
         &self,
         accounts: &[T],
@@ -251,41 +258,7 @@ impl DB {
 
     pub async fn query_accounts(
         &self,
-        accounts: &[&str],
-    ) -> Result<Vec<DBAccount>, Box<dyn Error>> {
-        if self.is_closed() {
-            return Err("DB is closed".into());
-        }
-
-        log::info!("query accounts data with args: {:?}", accounts);
-
-        let mut qry_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-            r#"SELECT
-    trading_day, broker_id, account_id, account_name,
-    balance, frozen_balance, pre_balance,
-    available, deposit, withdraw,
-    margin, frozen_margin, fee, frozen_fee,
-    premium, frozen_premium,
-    position_profit, close_profit, net_profit, currency_id
- FROM fund.account WHERE "#,
-        );
-
-        if accounts.is_empty() {
-            qry_builder.push("TRUE");
-        } else {
-            qry_builder
-                .push("account_id IN ")
-                .push_tuples(accounts, |mut b, v| {
-                    b.push_bind(*v);
-                });
-        }
-
-        self.execute_account_qry(qry_builder).await
-    }
-
-    pub async fn query_accounts_range(
-        &self,
-        accounts: &[&str],
+        accounts: &[(&str, &str)],
         start_date: Option<&str>,
         end_date: Option<&str>,
     ) -> Result<Vec<DBAccount>, Box<dyn Error>> {
@@ -313,9 +286,10 @@ impl DB {
 
         if !accounts.is_empty() {
             qry_builder
-                .push("account_id IN ")
-                .push_tuples(accounts, |mut b, v| {
-                    b.push_bind(*v);
+                .push("(broker_id, account_id) IN ")
+                .push_tuples(accounts, |mut b, (broker, account)| {
+                    b.push_bind(*broker)
+                        .push_bind(*account);
                 });
         } else {
             qry_builder.push("TRUE");
@@ -488,7 +462,7 @@ ORDER BY group_name DESC, broker_id, investor_id;"#
 
             log::info!("inserting for group investors: {:?}", group.investors);
             sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-                r#"INSERT OR IGNORE INTO meta.investor_group(group_name, broker_id, investor_id) "#
+                r#"INSERT OR REPLACE INTO meta.investor_group(group_name, broker_id, investor_id) "#
             ).push_values(
                 group.investors
                     .as_ref()
@@ -522,6 +496,59 @@ WHERE group_name = $1 AND (broker_id, investor_id) NOT IN"#
         Ok(group)
     }
 
+    pub async fn query_holidays(&self) -> Result<Vec<DBHoliday>, Box<dyn Error>> {
+        if self.is_closed() {
+            return Err("DB is closed".into());
+        }
+
+        log::info!("querying vacations");
+
+        let mut qry_builder = sqlx::QueryBuilder::new(
+            r#"SELECT
+year, name, start, end
+FROM meta.holidays
+WHERE deleted_at IS NULL
+ORDER BY year, start"#);
+
+        let query = qry_builder.build_query_as::<DBHoliday>();
+
+        let mut holidays = query.fetch_all(&self.pool).await?;
+
+        for holiday in holidays.iter_mut() {
+            let start = match chrono::NaiveDate::from_ymd_opt(
+                holiday.start/10000,
+                holiday.start as u32 % 10000 / 100,
+                holiday.start as u32 % 100,
+            ) {
+                Some(date) => date,
+                None => {
+                    log::error!("parse start date failed: {:?}", holiday);
+                    return Err("parse start date failed".into());
+                }
+            };
+            
+            let end = match chrono::NaiveDate::from_ymd_opt(
+                holiday.end/10000,
+                holiday.end as u32 % 10000 / 100,
+                holiday.end as u32 % 100,
+            ) {
+                Some(date) => date,
+                None => {
+                    log::error!("parse end date failed: {:?}", holiday);
+                    return Err("parse end date failed".into());
+                }
+            };
+
+            for d in start.iter_days().take_while(
+                |d| *d <= end,
+            ) {
+                holiday.range.push(d.format("%Y-%m-%d").to_string());
+            }
+        }
+
+        Ok(holidays)
+    }
+
     pub fn is_closed(&self) -> bool {
         self.pool.is_closed()
     }
@@ -530,6 +557,10 @@ WHERE group_name = $1 AND (broker_id, investor_id) NOT IN"#
 pub async fn open_db(
     base_dir: &str, schemas: &[&str],
 ) -> Result<DB, Box<dyn Error>> {
+    if base_dir.is_empty() {
+        return Err("open db preflight check failed".into());
+    }
+
     let mut schema_cache = HashMap::with_capacity(schemas.len());
 
     for v in schemas {
@@ -577,14 +608,35 @@ pub async fn open_db(
         .connect("")
         .await?;
 
-    let db = DB { pool };
+    let db = DB {
+        pool
+    };
 
     Ok(db)
+}
+
+async fn get_or_create_conn(db_file_path: &str) -> Result<(sqlx::Pool<sqlx::Sqlite>, bool), sqlx::Error> {
+    let mut exist = true;
+
+    if !sqlx::Sqlite::database_exists(db_file_path).await? {
+        sqlx::Sqlite::create_database(db_file_path).await?;
+        exist = false;
+    }
+
+    Ok((SqlitePoolOptions::new()
+        .min_connections(1)
+        .max_connections(1)
+        .connect(db_file_path)
+        .await?, exist))
 }
 
 pub async fn create_db(
     base_dir: &str, sql_dir: &str, schemas: &[&str],
 ) -> Result<DB, Box<dyn Error>> {
+    if base_dir.is_empty() || sql_dir.is_empty() {
+        return Err("create db preflight check failed".into());
+    }
+
     let mut schema_set = HashSet::with_capacity(schemas.len());
 
     for v in schemas {
@@ -601,16 +653,7 @@ pub async fn create_db(
         let sql_base = PathBuf::from(sql_dir)
             .join(schema);
 
-        let db_file_path = db_path.to_str().unwrap();
-
-        if !sqlx::Sqlite::database_exists(db_file_path).await? {
-            sqlx::Sqlite::create_database(db_file_path).await?;
-        }
-
-        let conn = SqlitePoolOptions::new()
-            .min_connections(1)
-            .max_connections(1)
-            .connect(db_file_path)
+        let (conn, _) = get_or_create_conn(db_path.to_str().unwrap())
             .await?;
 
         let structure_sql_path = sql_base
@@ -678,6 +721,76 @@ pub async fn create_db(
     open_db(base_dir, schemas).await
 }
 
+pub async fn migrate_db(
+    base_dir: &str, sql_base: &str, version: &str,
+    schemas: &[&str],
+) -> Result<DB, Box<dyn Error>> {
+    if base_dir.is_empty() | sql_base.is_empty() | version.is_empty() {
+        return Err("migrate db preflight check failed".into());
+    }
+
+    let mut schema_set = HashSet::with_capacity(schemas.len());
+
+    for v in schemas {
+        if !schema_set.insert(*v) {
+            log::warn!("Schema already exists: {}", *v);
+        }
+    }
+
+    for schema in schema_set {
+        let migrate_sql_file = PathBuf::from(sql_base)
+            .join(schema)
+            .join(format!("{}_migrate_{}.sql", schema, version));
+
+        log::info!("check migration: {}, {}, {:?}", schema, version, migrate_sql_file);
+
+        if fs::exists(&migrate_sql_file).unwrap_or(false) {
+            let migrate_done = PathBuf::from(&migrate_sql_file)
+                .with_extension("ok");
+
+            if fs::exists(&migrate_done).unwrap_or(false) {
+                log::info!("migration already done: {:?}, {:?}",
+                        migrate_sql_file, migrate_done);
+                continue;
+            }
+
+            let migrate_sql = fs::read_to_string(&migrate_sql_file)?;
+
+            log::info!("migrate sql found: {:?}", migrate_sql_file);
+
+            let db_path = PathBuf::from(base_dir)
+                .join(schema)
+                .with_extension("db");
+
+            let (conn, exist) = get_or_create_conn(db_path.to_str().unwrap())
+                .await?;
+
+            if !exist {
+                log::info!("db not exist, skip migration: {}, {}", schema, version);
+                continue;
+            }
+
+            match sqlx::query(&migrate_sql).execute(&conn).await {
+                Ok(_) => {
+                    log::info!("migrate successfully executed: {:?}", migrate_sql_file);
+
+                    if fs::File::create(&migrate_done).is_ok() {
+                        log::info!(
+                                "migrate marked done: {:?}, {:?}",
+                                migrate_sql_file, migrate_done
+                            );
+                    }
+                },
+                Err(e) => { return Err(e.into()); },
+            };
+        } else {
+            log::info!("no migration for current schema: {}, {}", schema, version);
+        }
+    }
+
+    create_db(base_dir, sql_base, schemas).await
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -742,20 +855,20 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(open_db("../data", &["fund"]))
+        let db = rt.block_on(open_db("./data", &["fund"]))
             .unwrap();
 
-        let result = rt.block_on(db.query_accounts(&["1000008"]))
+        let result = rt.block_on(db.query_accounts(&[("5100", "1000008")], None, None))
             .unwrap();
 
         for v in result {
             log::info!("{:?}", v);
         }
 
-        let result = rt.block_on(db.query_accounts_range(
-            &["880303", "1000008"],
+        let result = rt.block_on(db.query_accounts(
+            &[("5100", "880303"), ("5100","1000008")],
             Some("20250201"),
-            Some("20250205"),
+            Some("20250206"),
         )).unwrap();
 
         for v in result {
@@ -775,7 +888,7 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(open_db("../data", &["fund", "meta"]))
+        let db = rt.block_on(open_db("./data", &["fund", "meta"]))
             .unwrap();
 
         let result = rt.block_on(db.query_investors(true))
@@ -798,7 +911,7 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(open_db("../data", &["fund", "meta"]))
+        let db = rt.block_on(open_db("./data", &["fund", "meta"]))
             .unwrap();
 
         let g = rt.block_on(db.mod_group_investors(
@@ -816,5 +929,28 @@ mod test {
         )).unwrap();
 
         log::info!("{:?}", g);
+    }
+    
+    #[test]
+    fn test_query_holidays() {
+        env_logger::Builder::new()
+            .filter_level(log::LevelFilter::Debug)
+            .target(env_logger::Target::Stdout)
+            .init();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let db = rt.block_on(open_db("./data", &["fund", "meta"]))
+            .unwrap();
+        
+        let result = rt.block_on(db.query_holidays())
+            .unwrap();
+        
+        for v in result {
+            log::info!("{:?}", v);
+        }
     }
 }

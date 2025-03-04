@@ -4,10 +4,13 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { Vacation, DBInvestor, DBGroup } from "../models/db.ts"
 
+type DateType = string | number | dayjs.Dayjs | Date;
+
 export const metaStore = defineStore("meta", {
     state: () => {
         return {
             holidays: new Map([]) as Map<string, Vacation>,
+            vacation_list: [] as Array<Vacation>,
             investors: new Map([]) as Map<string, DBInvestor>,
             groups: new Map([]) as Map<string, DBGroup>,
             ungrouped: new Map([]) as Map<string, DBInvestor>,
@@ -17,17 +20,52 @@ export const metaStore = defineStore("meta", {
     },
     getters: {
         isHoliday: (state) => {
-            return (value: string | number | dayjs.Dayjs | Date): boolean => {
-                const date = dayjs(value)
+            return (value: DateType): boolean => {
+                const date = dayjs(value);
+                const weekDay = date.day();
 
-                return state.holidays.has(date.format("YYYY-MM-DD"))
+                return weekDay === 0 || weekDay === 6 || state.holidays.has(date.format("YYYY-MM-DD"))
             }
         },
         getHoliday: (state) => {
-            return (value: string | number | dayjs.Dayjs | Date): Vacation | undefined => {
+            return (value: DateType): Vacation | undefined => {
                 const date = dayjs(value)
 
                 return state.holidays.get(date.format("YYYY-MM-DD"))
+            }
+        },
+        getTradingDays: (state) => {
+            return (start: DateType | undefined = undefined, end: DateType | undefined): Array<dayjs.Dayjs> | undefined => {
+                if (!start && !state.firstDay) {
+                    console.log("no start date");
+                    return undefined;
+                }
+                if (!end && !state.lastDay) {
+                    console.log("no end date");
+                    return undefined;
+                }
+
+                const startDate = dayjs(start) || state.firstDay;
+                const endDate = dayjs(end) || state.lastDay;
+
+                if (endDate.isBefore(startDate)) {
+                    console.log("invalid range:", startDate, endDate);
+                    return undefined
+                }
+
+                const result = []
+
+                const diffDays = endDate.diff(startDate, 'day') + 1;
+
+                for (let i=0; i<diffDays; i++) {
+                    const d = startDate.add(i, "day")
+
+                    if (!(state as any).isHoliday(d)) {
+                        result.push(d);
+                    }
+                }
+
+                return result
             }
         },
         groupCount: (state): number => {
@@ -157,5 +195,34 @@ export const metaStore = defineStore("meta", {
                 }).catch(reject);
             })
         },
+        async doQueryHolidays(force: boolean=false): Promise<Array<Vacation>> {
+            return new Promise((resolve, reject) => {
+                if (this.holidays.size > 0 && !force) {
+                    resolve(this.vacation_list);
+                } else {
+                    console.log("query holidays");
+
+                    invoke("query_holidays")
+                        .then((values) => {
+                            this.vacation_list = values as Vacation[];
+
+                            this.holidays = new Map<string, Vacation>(
+                                this.vacation_list.reduce(
+                                    (pre, curr) => pre.concat(
+                                        curr.range.map((d: string):[string, Vacation] => {
+                                            return [d, curr]
+                                        })
+                                    ),
+                                    [] as [string, Vacation][],
+                                )
+                            )
+
+                            console.log("holiday cache:", this.holidays, this.getTradingDays('20250102', '20250206'));
+
+                            resolve(this.vacation_list);
+                        }).catch(reject);
+                }
+            })
+        }
     }
 })

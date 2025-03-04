@@ -1,43 +1,38 @@
 <script setup lang="ts">
-import {NButton, NButtonGroup, NIcon, NModal, NModalProvider, NSelect, NFlex} from "naive-ui";
-import {computed, h, ref} from "vue";
+import {
+  type TreeSelectOption,
+  NTreeSelect, NFlex, NButton, NIcon,
+  NModalProvider, NModal, NButtonGroup,
+} from "naive-ui";
+import {RefreshFilled, EditNoteFilled} from "@vicons/material";
+import {computed, ref, h} from "vue";
+import dayjs from "dayjs"
 
-import {metaStore} from "../store/meta.ts"
-import dayjs from "dayjs";
-import {useNotification} from "../utils/feedback.ts";
-import GroupEditor from "./GroupEditor.vue";
-import {EditNoteFilled, RefreshFilled} from "@vicons/material";
+import {metaStore} from "../store/meta.ts";
+import GroupEditor from "../components/GroupEditor.vue"
+import {useNotification} from "../utils/feedback.ts"
 
-const meta = metaStore();
-const notification = useNotification();
-
-interface GroupSelectorProps {
+interface SelectProps {
   loading?: boolean;
   multiple?: boolean;
 }
 
 const {
   loading = false,
-  multiple = false
-} = defineProps<GroupSelectorProps>();
+  multiple = false,
+} = defineProps<SelectProps>();
+
+const meta = metaStore();
+const notification = useNotification();
 
 const selected = defineModel<string | undefined>("selected");
-const investorLoading = ref(false);
-const showEditor = ref(false);
 
-const groupOptions = computed(() => {
-  return meta.groupInvestors.filter(
-      g => g.group_name != "未分组"
-  ).map((g) => {
-    return {
-      label: g.group_name,
-      value: g.group_name,
-    }
-  });
-})
+const showEditor = ref(false);
+const investorLoading = ref(false);
 
 function loadGroupInvestors(force: boolean=false) {
   investorLoading.value = true;
+
   meta.doQueryInvestors({force: force})
       .then((investors) => {
         const group_investors = meta.groupInvestors;
@@ -53,7 +48,7 @@ function loadGroupInvestors(force: boolean=false) {
               },
           ),
           meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-          duration: 3000,
+          duration: 5000,
         })
       }).catch((err) => {
     console.error("query investors failed:", err);
@@ -69,18 +64,33 @@ function loadGroupInvestors(force: boolean=false) {
 defineExpose({
   loadGroupInvestors,
 });
+
+const selectOptions = computed((): TreeSelectOption[] => {
+  return meta.groupInvestors.map((g) => {
+    return {
+      label: g.group_name,
+      key: g.group_name,
+      children: g.investors?.map((v) => {
+        return {
+          label: `${v.investor_name} (${v.investor_id})`,
+          key: `${g.group_name}.${v.broker_id}.${v.investor_id}`,
+        }
+      }),
+    }
+  });
+})
 </script>
 
 <template>
   <n-modal-provider>
     <n-modal v-model:show="showEditor" :mask-closable="false" size="large">
-      <GroupEditor :selected="selected" @close="showEditor = false" />
+      <GroupEditor :selected="selected?.split('.')[0]" @close="showEditor = false" />
     </n-modal>
   </n-modal-provider>
-  <n-select :loading="loading || investorLoading" :multiple="multiple"
-            v-model:value="selected" :options="groupOptions"
-            placeholder="请选择投资者组"
-            size="small" tag filterable clearable>
+  <n-tree-select :loading="loading || investorLoading" v-model:value="selected" :options="selectOptions"
+                 :multiple="multiple" check-strategy="child" placeholder="请选择投资者"
+                 :override-default-node-click-behavior="({option}) => {return option.children? 'toggleExpand': 'default'}"
+                 clearable filterable cascade virtual-scroll >
     <template #action>
       <n-flex justify="end">
         <n-button-group size="tiny">
@@ -97,9 +107,8 @@ defineExpose({
         </n-button-group>
       </n-flex>
     </template>
-  </n-select>
+  </n-tree-select>
 </template>
 
 <style scoped>
-
 </style>
