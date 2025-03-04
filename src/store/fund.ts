@@ -52,7 +52,7 @@ export const fundStore = defineStore("fund", {
                 this.accounts.get(idt)!.push(v);
             })
         },
-        async doQueryAccounts(
+        async doQueryAccount(
             account_id: string, {
                 broker_id = "5100",
                 startDate,
@@ -79,10 +79,13 @@ export const fundStore = defineStore("fund", {
 
                     this.accounts.delete([broker_id, account_id].join("."))
 
+                    const start = startDate? dayjs(startDate) : undefined;
+                    const end = endDate? dayjs(endDate) : undefined
+
                     invoke("query_accounts", {
-                        accounts: [account_id],
-                        startDate: startDate,
-                        endDate: endDate,
+                        accounts: [[broker_id, account_id]],
+                        startDate: start?.format("YYYYMMDD"),
+                        endDate: end?.format("YYYYMMDD"),
                     }).then((values) => {
                         this.handlerAccounts(values as DBAccount[]);
                         resolve(values as DBAccount[]);
@@ -138,14 +141,16 @@ export const fundStore = defineStore("fund", {
                         this.accounts.delete(k)
                     })
 
+                    const start = startDate? dayjs(startDate) : undefined;
+                    const end = endDate? dayjs(endDate) : undefined
+
                     invoke("query_accounts", {
                         accounts: [...query_accounts].map((v) => {
-                            return v.split(".", 2)[1];
+                            return v.split(".", 2);
                         }),
-                        startDate: startDate? dayjs(startDate).format("YYYYMMDD") : undefined,
-                        endDate: endDate? dayjs(endDate).format("YYYYMMDD") : undefined,
+                        startDate: start?.format("YYYYMMDD"),
+                        endDate: end?.format("YYYYMMDD"),
                     }).then((values) => {
-                        console.log("queried group accounts:", values);
                         this.handlerAccounts(values as DBAccount[]);
 
                         result.push(...(values as DBAccount[]));
