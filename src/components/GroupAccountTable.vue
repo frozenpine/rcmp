@@ -135,6 +135,7 @@ const dataColumns = ref([
   defineColumn({
     title: "经纪商",
     key: "broker_id",
+    numFmt: ";;;@",
     titleAlign: "center",
     show: false,
     sortable: false,
@@ -143,6 +144,7 @@ const dataColumns = ref([
     title: "资金账号",
     key: "account_id",
     fixed: "left",
+    numFmt: ";;;@",
     sortable: false,
     width: 100,
     titleAlign: "center"
@@ -151,6 +153,7 @@ const dataColumns = ref([
     title: "账号名称",
     key: "account_name",
     fixed: "left",
+    numFmt: ";;;@",
     sortable: false,
     width: 100,
     titleAlign: "center",
@@ -159,6 +162,7 @@ const dataColumns = ref([
     title: "交易日",
     key: "trading_day",
     fixed: "left",
+    numFmt: ";;;@",
     sortable: false,
     width: 100,
     titleAlign: "center",
@@ -599,11 +603,14 @@ const contextMenu = ref<{
   x: number;
   y: number;
   show: boolean;
-  options: DropdownOption[];
+  options: {key: string; label: string;}[];
 }>({
   x: 0, y: 0,
   show: false,
-  options: [{ label: '导出最新数据', key: 'latest' }, { label: '导出全部数据', key: 'all' },]
+  options: [
+    { label: '导出最新数据', key: 'latest' }, 
+    { label: '导出历史数据', key: 'all' },
+  ],
 });
 
 function handleMenuSelect(sel: string) {
@@ -649,7 +656,7 @@ function handleMenuSelect(sel: string) {
 
   switch (sel) {
     case "all": {
-      fileName = `account_all_${now}.xlsx`;
+      fileName = `交易资金_历史_${now}.xlsx`;
 
       groupedData.value.forEach((row) => {
         // 每用户统计
@@ -705,7 +712,7 @@ function handleMenuSelect(sel: string) {
       break;
     }
     case "latest": {
-      fileName = `account_current_${now}.xlsx`;
+      fileName = `交易资金_最新_${now}.xlsx`;
 
       workSheet.addRows(groupedData.value);
 
@@ -713,7 +720,7 @@ function handleMenuSelect(sel: string) {
     }
     default: {
       console.error("unsupported menu item:", sel);
-      const options = contextMenu.options.filter((v) => v.key === sel);
+      const options = contextMenu.value.options.filter((v) => v.key === sel);
       message.error(`尚未支持【${options.length > 0 ? options[0].label : sel}】该菜单选项`);
       return;
     }

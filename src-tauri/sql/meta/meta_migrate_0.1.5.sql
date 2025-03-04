@@ -14,6 +14,6 @@ CREATE TABLE "holidays" (
   PRIMARY KEY ("year", "name", "start", "end")
 );
 
-INSERT INTO "holidays" SELECT year,name,start,end,created_at,deleted_at FROM "holidays_0_1_3";
+INSERT INTO "holidays"(year,name,start,end,created_at,deleted_at) SELECT year,name,start,end,created_at,deleted_at FROM "holidays_0_1_3";
 
 PRAGMA foreign_keys = true;
