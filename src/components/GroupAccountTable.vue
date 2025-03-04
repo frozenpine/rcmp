@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   type DataTableColumns, type DataTableCreateSummary,
-  type DropdownOption, type DropdownGroupOption, type DropdownMixedOption,
+  type DropdownOption, type DropdownGroupOption,
   NDataTable, NDropdown, NWatermark, NFlex, NSwitch,
   NButton, NIcon, NCheckbox, NButtonGroup, NEllipsis,
 } from "naive-ui";
@@ -599,7 +599,7 @@ const contextMenu = ref<{
   x: number;
   y: number;
   show: boolean;
-  options: DropdownMixedOption[];
+  options: DropdownOption[];
 }>({
   x: 0, y: 0,
   show: false,
