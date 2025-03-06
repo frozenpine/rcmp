@@ -250,7 +250,7 @@ impl DB {
         &self,
         mut qry_builder: sqlx::QueryBuilder<'_, sqlx::Sqlite>,
     ) -> Result<Vec<DBAccount>, Box<dyn Error>> {
-        qry_builder.push(" ORDER BY account_id ASC, trading_day DESC;");
+        qry_builder.push(" ORDER BY trading_day DESC, broker_id ASC, account_id ASC;");
 
         let query = qry_builder.build_query_as::<DBAccount>();
         Ok(query.fetch_all(&self.pool).await?)
