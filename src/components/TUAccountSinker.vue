@@ -36,7 +36,10 @@ async function sink_account(dir: boolean = false) {
         console.log("all account data sunk finished", source, count);
         message.success(`已导入【${count}】条资金记录`);
       })
-      .catch(console.error)
+      .catch((e) => {
+        console.log("导入资金账号数据失败:", e);
+        message.error(`导入资金账号数据失败: ${source}`);
+      })
       .finally(() => {parsing.value = false;});
 }
 </script>

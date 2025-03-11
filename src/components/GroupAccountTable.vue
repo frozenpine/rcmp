@@ -47,6 +47,8 @@ const notification = useNotification();
 
 const showWaterMark = ref(false);
 
+const dateRange: [string|undefined, string|undefined] = [undefined, undefined];
+
 interface RowData extends DBAccount {
   [index: string | symbol]: string | number | RowData[] | undefined;
   group: RowData[];
@@ -543,10 +545,21 @@ const parentColumns = computed(() => {
 const groupedData = computed((): RowData[] => {
   if (!data || data.length < 1) return [];
 
+  // 清除数据的起止日期范围
+  dateRange[0] = undefined;
+  dateRange[1] = undefined;
 
   const results: RowData[] = [...data.reduce(
     (result: Map<string, RowData>, curr: DBAccount) => {
       const idt = [curr.broker_id, curr.account_id].join(".");
+
+      if (!dateRange[0] || curr.trading_day < dateRange[0]!) {
+        dateRange[0] = curr.trading_day;
+      }
+
+      if (!dateRange[1] || curr.trading_day > dateRange[1]!) {
+        dateRange[1] = curr.trading_day;
+      }
 
       let data = result.get(idt);
 
@@ -726,8 +739,8 @@ function handleMenuSelect(sel: string) {
     }
   }
 
-  const lastDay = dayjs(data![0].trading_day);
-  const firstDay = dayjs(data![data!.length - 1].trading_day);
+  const lastDay = dayjs(dateRange[1]);
+  const firstDay = dayjs(dateRange[0]);
 
   const diffMonth = lastDay.diff(firstDay, "month") + 1;
 
@@ -897,14 +910,8 @@ const investorDurationSummary: DataTableCreateSummary<RowData> = (pageData): Sum
 }
 
 const groupDurationSummary: DataTableCreateSummary<RowData> = (pageData): SummaryRowData | SummaryRowData[] => {
-  const lastDay = dayjs(
-    pageData[0].group![0].trading_day
-  );
-  const firstDay = dayjs(
-    pageData[pageData.length - 1]
-      .group![pageData[pageData.length - 1].group!.length - 1]
-      .trading_day
-  );
+  const lastDay = dayjs(dateRange[1]);
+  const firstDay = dayjs(dateRange[0]);
 
   const diffMonth = lastDay.diff(firstDay, "month") + 1;
 
