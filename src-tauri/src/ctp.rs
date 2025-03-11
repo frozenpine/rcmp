@@ -98,31 +98,31 @@ pub mod tu {
         #[serde(alias = "投资者名称")]
         pub user_name: String,
 
-        #[serde(alias = "风险度")]
+        #[serde(alias = "风险度", default)]
         pub risk_percent: PercentValue,
 
         #[serde(alias = "昨权益")]
         pub pre_balance: f64,
 
-        #[serde(alias = "入金")]
+        #[serde(alias = "入金", default)]
         pub deposit: f64,
 
-        #[serde(alias = "出金")]
+        #[serde(alias = "出金", default)]
         pub withdraw: f64,
 
-        #[serde(alias = "冻结保证金")]
+        #[serde(alias = "冻结保证金", default)]
         pub frozen_margin: f64,
 
-        #[serde(alias = "冻结权利金")]
+        #[serde(alias = "冻结权利金", default)]
         pub frozen_premium: f64,
 
-        #[serde(alias = "冻结手续费")]
+        #[serde(alias = "冻结手续费", default)]
         pub frozen_fee: f64,
 
         #[serde(alias = "保证金")]
         pub margin: f64,
 
-        #[serde(alias = "权利金")]
+        #[serde(alias = "权利金", default)]
         pub premium: f64,
 
         #[serde(alias = "手续费")]
@@ -137,43 +137,43 @@ pub mod tu {
         #[serde(alias = "权益")]
         pub balance: f64,
 
-        #[serde(alias = "可用资金")]
+        #[serde(alias = "可用资金", default)]
         pub available: f64,
 
-        #[serde(alias = "资金冻结")]
+        #[serde(alias = "资金冻结", default)]
         pub frozen_balance: f64,
 
-        #[serde(alias = "上次质押金额")]
+        #[serde(alias = "上次质押金额", default)]
         pub pre_pledge: f64,
 
-        #[serde(alias = "质押金额")]
+        #[serde(alias = "质押金额", default)]
         pub pledge: f64,
 
-        #[serde(alias = "投资者交割保证金")]
+        #[serde(alias = "投资者交割保证金", default)]
         pub deliv_margin: f64,
 
-        #[serde(alias = "上次货币质入金额")]
+        #[serde(alias = "上次货币质入金额", default)]
         pub pre_currency_pledge_in: f64,
 
-        #[serde(alias = "上次货币质出金额")]
+        #[serde(alias = "上次货币质出金额", default)]
         pub pre_currency_pledge_out: f64,
 
-        #[serde(alias = "货币质入金额")]
+        #[serde(alias = "货币质入金额", default)]
         pub currency_pledge_in: f64,
 
-        #[serde(alias = "货币质出金额")]
+        #[serde(alias = "货币质出金额", default)]
         pub currency_pledge_out: f64,
 
-        #[serde(alias = "交易所风险度")]
+        #[serde(alias = "交易所风险度", default)]
         pub risk_percent_in_exchange: PercentValue,
 
-        #[serde(alias = "交易所保证金")]
+        #[serde(alias = "交易所保证金", default)]
         pub margin_in_exchange: f64,
 
-        #[serde(alias = "交易所可用资金")]
+        #[serde(alias = "交易所可用资金", default)]
         pub available_in_exchange: f64,
 
-        #[serde(alias = "交易所交割保证金")]
+        #[serde(alias = "交易所交割保证金", default)]
         pub deliv_margin_in_exchange: f64,
 
         #[serde(alias = "币种代码")]
@@ -395,7 +395,7 @@ mod test {
 
         let find_accounts =
             tu::read_account_csv(
-                "../data/查询资金2025-02-06.csv", &["880303"],
+                "../data/查询资金2025-03-11.csv", &[],
             ).unwrap();
 
         assert_eq!(find_accounts.len(), 1);
