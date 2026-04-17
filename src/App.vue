@@ -81,7 +81,8 @@ onMounted(async () => {
   windowHeight.value = window.innerHeight;
 
   const notification = useNotification();
-  metaStore().doQueryHolidays()
+  const meta = metaStore();
+  meta.doQueryHolidays()
       .then((holidays) => {
         const startYear = holidays[0].year;
         const lastYear = holidays[holidays.length-1].year;
@@ -97,6 +98,16 @@ onMounted(async () => {
             },
             [] as [number, Vacation[]][]
         ).reverse();
+
+        const today = dayjs();
+    
+        if (meta.isHoliday(today)) {
+          selectedEnd.value = meta.preTradingDay().format("YYYY-MM-DD")
+        } else {
+          selectedEnd.value = today.format("YYYY-MM-DD")
+        }
+
+        selectedStart.value = meta.nextTradingDay(`${today.year()}-01-01`).format("YYYY-MM-DD")
 
         notification.info({
           title: "法定节假日查询完成",

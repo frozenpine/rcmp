@@ -1,4 +1,4 @@
-import {defineStore} from "pinia";
+import { defineStore } from "pinia";
 import dayjs from "dayjs"
 import { invoke } from "@tauri-apps/api/core";
 
@@ -34,6 +34,28 @@ export const metaStore = defineStore("meta", {
                 return state.holidays.get(date.format("YYYY-MM-DD"))
             }
         },
+        preTradingDay: (state) => {
+            return (value?: DateType): dayjs.Dayjs => {
+                let td = value ? dayjs(value) : dayjs()
+
+                while ((state as any).isHoliday(td)) {
+                    td = td.subtract(1, "days")
+                }
+
+                return td
+            }
+        },
+        nextTradingDay: (state) => {
+            return (value?: DateType): dayjs.Dayjs => {
+                let td = value ? dayjs(value) : dayjs()
+
+                while ((state as any).isHoliday(td)) {
+                    td = td.add(1, "days")
+                }
+
+                return td
+            }
+        },
         getTradingDays: (state) => {
             return (start: DateType | undefined = undefined, end: DateType | undefined): Array<dayjs.Dayjs> | undefined => {
                 if (!start && !state.firstDay) {
@@ -57,7 +79,7 @@ export const metaStore = defineStore("meta", {
 
                 const diffDays = endDate.diff(startDate, 'day') + 1;
 
-                for (let i=0; i<diffDays; i++) {
+                for (let i = 0; i < diffDays; i++) {
                     const d = startDate.add(i, "day")
 
                     if (!(state as any).isHoliday(d)) {
@@ -69,16 +91,16 @@ export const metaStore = defineStore("meta", {
             }
         },
         groupCount: (state): number => {
-            return state.groups? state.groups.size : 0
+            return state.groups ? state.groups.size : 0
         },
         groupedInvestorCount: (state): number => {
-            return state.investors? [...state.investors.values()].reduce(
-                (pre, curr) => pre + ((curr.groups && curr.groups.length > 0)? 1 : 0),
+            return state.investors ? [...state.investors.values()].reduce(
+                (pre, curr) => pre + ((curr.groups && curr.groups.length > 0) ? 1 : 0),
                 0
             ) : 0;
         },
         getGroup: (state) => {
-            return (name: string): DBGroup|undefined => {
+            return (name: string): DBGroup | undefined => {
                 return state.groups.get(name);
             }
         },
@@ -125,8 +147,8 @@ export const metaStore = defineStore("meta", {
                         this.ungrouped.clear();
 
                         investors.forEach((v) => {
-                            const first_day = v.first_day? dayjs(v.first_day) : undefined;
-                            const last_day = v.last_day? dayjs(v.last_day) : undefined;
+                            const first_day = v.first_day ? dayjs(v.first_day) : undefined;
+                            const last_day = v.last_day ? dayjs(v.last_day) : undefined;
 
                             if (first_day && (!this.firstDay || first_day!.isBefore(this.firstDay))) {
                                 this.firstDay = first_day;
@@ -195,7 +217,7 @@ export const metaStore = defineStore("meta", {
                 }).catch(reject);
             })
         },
-        async doQueryHolidays(force: boolean=false): Promise<Array<Vacation>> {
+        async doQueryHolidays(force: boolean = false): Promise<Array<Vacation>> {
             return new Promise((resolve, reject) => {
                 if (this.holidays.size > 0 && !force) {
                     resolve(this.vacation_list);
@@ -209,7 +231,7 @@ export const metaStore = defineStore("meta", {
                             this.holidays = new Map<string, Vacation>(
                                 this.vacation_list.reduce(
                                     (pre, curr) => pre.concat(
-                                        curr.range.map((d: string):[string, Vacation] => {
+                                        curr.range.map((d: string): [string, Vacation] => {
                                             return [d, curr]
                                         })
                                     ),
