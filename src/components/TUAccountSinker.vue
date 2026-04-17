@@ -46,7 +46,7 @@ async function sink_account(dir: boolean = false) {
 
 <template>
   <n-spin size="small" :show="parsing">
-    <n-flex align="baseline" inline>
+    <n-flex align="center" inline>
       <n-icon style="margin-right: 5px" size="20"><DatabaseImport/></n-icon>
       <n-button-group size="small" :disabled="parsing">
         <n-button @click="()=> sink_account(true)" ghost round v-if="fromDir" >

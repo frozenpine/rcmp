@@ -80,9 +80,9 @@ impl Display for PercentValue {
 
 pub mod tu {
     use super::{CurrencyID, PercentValue};
+    use crate::db;
     use std::collections::hash_set;
     use std::io::Read;
-    use crate::db;
 
     #[derive(Debug, Default, serde::Deserialize, serde::Serialize, Clone)]
     pub struct Account {
@@ -184,8 +184,10 @@ pub mod tu {
         fn get_trading_day(&self) -> String {
             self.trading_day.clone()
         }
-        
-        fn get_broker_id(&self) -> String {self.broker_id.clone()}
+
+        fn get_broker_id(&self) -> String {
+            self.broker_id.clone()
+        }
 
         fn get_account_id(&self) -> String {
             self.user_id.clone()
@@ -296,10 +298,7 @@ pub mod tu {
 
         while let Ok(exist) = finder.read_record(&mut record) {
             if !exist {
-                return Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "csv parser error",
-                )));
+                return Err(Box::new(std::io::Error::other("csv parser error")));
             }
 
             let name = record.iter().next().unwrap_or("");
@@ -369,7 +368,7 @@ pub mod tu {
                 }
 
                 let file_name = e.file_name().to_str().unwrap_or("");
-                
+
                 file_name.ends_with(".csv") && file_name.starts_with("查询资金")
             })
         {
@@ -393,10 +392,7 @@ mod test {
             .target(env_logger::Target::Stdout)
             .init();
 
-        let find_accounts =
-            tu::read_account_csv(
-                "../data/查询资金2025-03-11.csv", &[],
-            ).unwrap();
+        let find_accounts = tu::read_account_csv("../data/查询资金2025-03-11.csv", &[]).unwrap();
 
         assert_eq!(find_accounts.len(), 1);
         assert_eq!(find_accounts[0].user_id, "880303");
@@ -410,9 +406,7 @@ mod test {
             .target(env_logger::Target::Stdout)
             .init();
 
-        let accounts = tu::read_account_dir(
-            "../data/", &["880303"], 1,
-        ).unwrap();
+        let accounts = tu::read_account_dir("../data/", &["880303"], 1).unwrap();
 
         accounts.iter().for_each(|account| {
             log::info!("{:?}", account);

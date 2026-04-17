@@ -1,4 +1,6 @@
+use chrono::Datelike;
 use lazy_static::lazy_static;
+use sqlx::migrate::MigrateDatabase;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Executor, Row};
 use std::collections::{HashMap, HashSet};
@@ -7,7 +9,6 @@ use std::fs;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use sqlx::migrate::MigrateDatabase;
 
 pub trait AccountInfo: Send + Sync {
     fn get_trading_day(&self) -> String;
@@ -285,12 +286,12 @@ impl DB {
         );
 
         if !accounts.is_empty() {
-            qry_builder
-                .push("(broker_id, account_id) IN ")
-                .push_tuples(accounts, |mut b, (broker, account)| {
-                    b.push_bind(*broker)
-                        .push_bind(*account);
-                });
+            qry_builder.push("(broker_id, account_id) IN ").push_tuples(
+                accounts,
+                |mut b, (broker, account)| {
+                    b.push_bind(*broker).push_bind(*account);
+                },
+            );
         } else {
             qry_builder.push("TRUE");
         }
@@ -307,7 +308,8 @@ impl DB {
     }
 
     pub async fn query_investors(
-        &self, include_all: bool,
+        &self,
+        include_all: bool,
     ) -> Result<Vec<DBInvestor>, Box<dyn Error>> {
         if self.is_closed() {
             return Err("DB is closed".into());
@@ -348,26 +350,30 @@ UNION ALL SELECT
 FROM fund.account
 WHERE $1 AND account_id NOT IN (SELECT investor_id FROM investors)
 GROUP BY broker_id, account_id
-ORDER BY group_name DESC, broker_id, investor_id;"#
+ORDER BY group_name DESC, broker_id, investor_id;"#,
         );
-        
-        let rows = qry_builder.build()
+
+        let rows = qry_builder
+            .build()
             .bind(include_all)
-            .fetch_all(&self.pool).await?;
-        
-        if rows.is_empty() { return Ok(Vec::new()); }
-        
+            .fetch_all(&self.pool)
+            .await?;
+
+        if rows.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let mut investors: Vec<DBInvestor> = Vec::with_capacity(rows.len());
 
         for row in rows {
             let broker_id = row.get("broker_id");
             let investor_id = row.get("investor_id");
-            
-            if investors.is_empty() || 
-                investors[investors.len() - 1].broker_id != broker_id || 
-                investors[investors.len() - 1].investor_id != investor_id {
-                
-                investors.push(DBInvestor{
+
+            if investors.is_empty()
+                || investors[investors.len() - 1].broker_id != broker_id
+                || investors[investors.len() - 1].investor_id != investor_id
+            {
+                investors.push(DBInvestor {
                     broker_id,
                     investor_id,
                     investor_name: row.get("investor_name"),
@@ -390,14 +396,13 @@ ORDER BY group_name DESC, broker_id, investor_id;"#
                     investor.groups = Some(vec![])
                 }
 
-                investor.groups.as_mut().unwrap()
-                    .push(DBInvestorGroup{
-                        group_name: group_name.clone(),
-                        group_desc: row.get("group_desc"),
-                        created_at: row.get("grp_create"),
-                        deleted_at: None,
-                        investors: None,
-                    });
+                investor.groups.as_mut().unwrap().push(DBInvestorGroup {
+                    group_name: group_name.clone(),
+                    group_desc: row.get("group_desc"),
+                    created_at: row.get("grp_create"),
+                    deleted_at: None,
+                    investors: None,
+                });
             }
         }
 
@@ -405,7 +410,9 @@ ORDER BY group_name DESC, broker_id, investor_id;"#
     }
 
     pub async fn mod_group_investors(
-        &self, group_name: &str, group_desc: Option<&str>,
+        &self,
+        group_name: &str,
+        group_desc: Option<&str>,
         investors: &[DBInvestor],
     ) -> Result<DBInvestorGroup, Box<dyn Error>> {
         if group_name.is_empty() {
@@ -416,17 +423,15 @@ ORDER BY group_name DESC, broker_id, investor_id;"#
 
         log::info!("inserting group: {}", group_name);
         let mut group = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-            r#"INSERT OR REPLACE INTO meta.group_info(group_name, group_desc)"#
-        ).push_values(
-            [(group_name, desc)],
-            |mut b, values| {
-                b.push_bind(values.0)
-                    .push_bind(values.1);
-            }
-        ).push("RETURNING group_name, group_desc, created_at, deleted_at;")
-            .build_query_as::<DBInvestorGroup>()
-            .fetch_one(&self.pool)
-            .await?;
+            r#"INSERT OR REPLACE INTO meta.group_info(group_name, group_desc)"#,
+        )
+        .push_values([(group_name, desc)], |mut b, values| {
+            b.push_bind(values.0).push_bind(values.1);
+        })
+        .push("RETURNING group_name, group_desc, created_at, deleted_at;")
+        .build_query_as::<DBInvestorGroup>()
+        .fetch_one(&self.pool)
+        .await?;
 
         if !investors.is_empty() {
             log::info!("inserting for group investors: {:?}", investors);
@@ -508,7 +513,8 @@ WHERE group_name = $1 AND (broker_id, investor_id) NOT IN"#
 year, name, start, end
 FROM meta.holidays
 WHERE deleted_at IS NULL
-ORDER BY year, start"#);
+ORDER BY year, start"#,
+        );
 
         let query = qry_builder.build_query_as::<DBHoliday>();
 
@@ -516,7 +522,7 @@ ORDER BY year, start"#);
 
         for holiday in holidays.iter_mut() {
             let start = match chrono::NaiveDate::from_ymd_opt(
-                holiday.start/10000,
+                holiday.start / 10000,
                 holiday.start as u32 % 10000 / 100,
                 holiday.start as u32 % 100,
             ) {
@@ -526,9 +532,9 @@ ORDER BY year, start"#);
                     return Err("parse start date failed".into());
                 }
             };
-            
+
             let end = match chrono::NaiveDate::from_ymd_opt(
-                holiday.end/10000,
+                holiday.end / 10000,
                 holiday.end as u32 % 10000 / 100,
                 holiday.end as u32 % 100,
             ) {
@@ -539,9 +545,7 @@ ORDER BY year, start"#);
                 }
             };
 
-            for d in start.iter_days().take_while(
-                |d| *d <= end,
-            ) {
+            for d in start.iter_days().take_while(|d| *d <= end) {
                 holiday.range.push(d.format("%Y-%m-%d").to_string());
             }
         }
@@ -549,14 +553,39 @@ ORDER BY year, start"#);
         Ok(holidays)
     }
 
+    pub async fn add_holiday(
+        &self,
+        name: &str,
+        start: chrono::NaiveDate,
+        end: chrono::NaiveDate,
+    ) -> Result<DBHoliday, Box<dyn Error>> {
+        let year = end.year();
+        let start_value = start.year() * 10000 + start.month() as i32 * 100 + start.day() as i32;
+        let end_value = end.year() * 10000 + end.month() as i32 * 100 + end.day() as i32;
+
+        log::info!("adding new holiday[{}]: {:?}, {:?}", name, start, end);
+
+        let result = sqlx::query_as::<sqlx::Sqlite, DBHoliday>(
+            r#"INSERT INTO meta.holidays(
+    year, name, start, end
+) VALUES (?, ?, ?, ?) RETURNING *"#,
+        )
+        .bind(year)
+        .bind(name)
+        .bind(start_value)
+        .bind(end_value)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(result)
+    }
+
     pub fn is_closed(&self) -> bool {
         self.pool.is_closed()
     }
 }
 
-pub async fn open_db(
-    base_dir: &str, schemas: &[&str],
-) -> Result<DB, Box<dyn Error>> {
+pub async fn open_db(base_dir: &str, schemas: &[&str]) -> Result<DB, Box<dyn Error>> {
     if base_dir.is_empty() {
         return Err("open db preflight check failed".into());
     }
@@ -594,11 +623,11 @@ pub async fn open_db(
             sql.push(';');
 
             log::debug!(
-                    "registering schema for conn with sql: {:?}, {:?}, {}",
-                    conn,
-                    meta,
-                    sql
-                );
+                "registering schema for conn with sql: {:?}, {:?}, {}",
+                conn,
+                meta,
+                sql
+            );
 
             Box::pin(async move {
                 conn.execute(sql.as_str()).await?;
@@ -608,14 +637,14 @@ pub async fn open_db(
         .connect("")
         .await?;
 
-    let db = DB {
-        pool
-    };
+    let db = DB { pool };
 
     Ok(db)
 }
 
-async fn get_or_create_conn(db_file_path: &str) -> Result<(sqlx::Pool<sqlx::Sqlite>, bool), sqlx::Error> {
+async fn get_or_create_conn(
+    db_file_path: &str,
+) -> Result<(sqlx::Pool<sqlx::Sqlite>, bool), sqlx::Error> {
     let mut exist = true;
 
     if !sqlx::Sqlite::database_exists(db_file_path).await? {
@@ -623,15 +652,20 @@ async fn get_or_create_conn(db_file_path: &str) -> Result<(sqlx::Pool<sqlx::Sqli
         exist = false;
     }
 
-    Ok((SqlitePoolOptions::new()
-        .min_connections(1)
-        .max_connections(1)
-        .connect(db_file_path)
-        .await?, exist))
+    Ok((
+        SqlitePoolOptions::new()
+            .min_connections(1)
+            .max_connections(1)
+            .connect(db_file_path)
+            .await?,
+        exist,
+    ))
 }
 
 pub async fn create_db(
-    base_dir: &str, sql_dir: &str, schemas: &[&str],
+    base_dir: &str,
+    sql_dir: &str,
+    schemas: &[&str],
 ) -> Result<DB, Box<dyn Error>> {
     if base_dir.is_empty() || sql_dir.is_empty() {
         return Err("create db preflight check failed".into());
@@ -646,28 +680,18 @@ pub async fn create_db(
     }
 
     for schema in schema_set {
-        let db_path = PathBuf::from(base_dir)
-            .join(schema)
-            .with_extension("db");
+        let db_path = PathBuf::from(base_dir).join(schema).with_extension("db");
 
-        let sql_base = PathBuf::from(sql_dir)
-            .join(schema);
+        let sql_base = PathBuf::from(sql_dir).join(schema);
 
-        let (conn, _) = get_or_create_conn(db_path.to_str().unwrap())
-            .await?;
+        let (conn, _) = get_or_create_conn(db_path.to_str().unwrap()).await?;
 
-        let structure_sql_path = sql_base
-            .join(schema)
-            .with_extension("sql");
+        let structure_sql_path = sql_base.join(schema).with_extension("sql");
 
         log::debug!("create schema structure by: {:?}", structure_sql_path);
-        let structure_sql = fs::read_to_string(
-            structure_sql_path,
-        )?;
+        let structure_sql = fs::read_to_string(structure_sql_path)?;
 
-        let _ = sqlx::query(&structure_sql)
-            .execute(&conn)
-            .await?;
+        let _ = sqlx::query(&structure_sql).execute(&conn).await?;
 
         for entry in walkdir::WalkDir::new(sql_base)
             .max_depth(1)
@@ -692,7 +716,11 @@ pub async fn create_db(
 
             if let Ok(exist) = fs::exists(data_sql_done.as_path()) {
                 if exist {
-                    log::info!("initial data already done: {:?}, {:?}", entry, data_sql_done);
+                    log::info!(
+                        "initial data already done: {:?}, {:?}",
+                        entry,
+                        data_sql_done
+                    );
                     continue;
                 }
             }
@@ -701,10 +729,7 @@ pub async fn create_db(
 
             let data_sql = fs::read_to_string(entry.path())?;
 
-            match sqlx::query(&data_sql)
-                .execute(&conn)
-                .await
-            {
+            match sqlx::query(&data_sql).execute(&conn).await {
                 Ok(result) => {
                     log::info!("data sql finished: {:?}", result);
 
@@ -712,7 +737,7 @@ pub async fn create_db(
                         Ok(_) => log::info!("data ok file created: {:?}", data_sql_done),
                         Err(e) => log::error!("failed to create data ok file: {:?}", e),
                     }
-                },
+                }
                 Err(e) => log::error!("data sql exec failed: {:?}, {:?}", entry, e),
             }
         }
@@ -722,7 +747,9 @@ pub async fn create_db(
 }
 
 pub async fn migrate_db(
-    base_dir: &str, sql_base: &str, version: &str,
+    base_dir: &str,
+    sql_base: &str,
+    version: &str,
     schemas: &[&str],
 ) -> Result<DB, Box<dyn Error>> {
     if base_dir.is_empty() | sql_base.is_empty() | version.is_empty() {
@@ -742,15 +769,22 @@ pub async fn migrate_db(
             .join(schema)
             .join(format!("{}_migrate_{}.sql", schema, version));
 
-        log::info!("check migration: {}, {}, {:?}", schema, version, migrate_sql_file);
+        log::info!(
+            "check migration: {}, {}, {:?}",
+            schema,
+            version,
+            migrate_sql_file
+        );
 
         if fs::exists(&migrate_sql_file).unwrap_or(false) {
-            let migrate_done = PathBuf::from(&migrate_sql_file)
-                .with_extension("ok");
+            let migrate_done = PathBuf::from(&migrate_sql_file).with_extension("ok");
 
             if fs::exists(&migrate_done).unwrap_or(false) {
-                log::info!("migration already done: {:?}, {:?}",
-                        migrate_sql_file, migrate_done);
+                log::info!(
+                    "migration already done: {:?}, {:?}",
+                    migrate_sql_file,
+                    migrate_done
+                );
                 continue;
             }
 
@@ -758,12 +792,9 @@ pub async fn migrate_db(
 
             log::info!("migrate sql found: {:?}", migrate_sql_file);
 
-            let db_path = PathBuf::from(base_dir)
-                .join(schema)
-                .with_extension("db");
+            let db_path = PathBuf::from(base_dir).join(schema).with_extension("db");
 
-            let (conn, exist) = get_or_create_conn(db_path.to_str().unwrap())
-                .await?;
+            let (conn, exist) = get_or_create_conn(db_path.to_str().unwrap()).await?;
 
             if !exist {
                 log::info!("db not exist, skip migration: {}, {}", schema, version);
@@ -776,12 +807,15 @@ pub async fn migrate_db(
 
                     if fs::File::create(&migrate_done).is_ok() {
                         log::info!(
-                                "migrate marked done: {:?}, {:?}",
-                                migrate_sql_file, migrate_done
-                            );
+                            "migrate marked done: {:?}, {:?}",
+                            migrate_sql_file,
+                            migrate_done
+                        );
                     }
-                },
-                Err(e) => { return Err(e.into()); },
+                }
+                Err(e) => {
+                    return Err(e.into());
+                }
             };
         } else {
             log::info!("no migration for current schema: {}, {}", schema, version);
@@ -832,11 +866,7 @@ mod test {
             .unwrap();
 
         rt.block_on(async {
-            match create_db(
-                "../data", "../sql",
-                &["fund", "meta"])
-                .await
-            {
+            match create_db("../data", "../sql", &["fund", "meta"]).await {
                 Ok(db) => log::info!("db created: {:?}", db),
                 Err(e) => log::error!("failed to create db: {:?}", e),
             }
@@ -855,21 +885,23 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(open_db("./data", &["fund"]))
-            .unwrap();
+        let db = rt.block_on(open_db("./data", &["fund"])).unwrap();
 
-        let result = rt.block_on(db.query_accounts(&[("5100", "1000008")], None, None))
+        let result = rt
+            .block_on(db.query_accounts(&[("5100", "1000008")], None, None))
             .unwrap();
 
         for v in result {
             log::info!("{:?}", v);
         }
 
-        let result = rt.block_on(db.query_accounts(
-            &[("5100", "880303"), ("5100","1000008")],
-            Some("20250201"),
-            Some("20250206"),
-        )).unwrap();
+        let result = rt
+            .block_on(db.query_accounts(
+                &[("5100", "880303"), ("5100", "1000008")],
+                Some("20250201"),
+                Some("20250206"),
+            ))
+            .unwrap();
 
         for v in result {
             log::info!("{:?}", v);
@@ -888,11 +920,9 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(open_db("./data", &["fund", "meta"]))
-            .unwrap();
+        let db = rt.block_on(open_db("./data", &["fund", "meta"])).unwrap();
 
-        let result = rt.block_on(db.query_investors(true))
-            .unwrap();
+        let result = rt.block_on(db.query_investors(true)).unwrap();
 
         for v in result {
             log::info!("{:?}", v);
@@ -911,26 +941,29 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(open_db("./data", &["fund", "meta"]))
-            .unwrap();
+        let db = rt.block_on(open_db("./data", &["fund", "meta"])).unwrap();
 
-        let g = rt.block_on(db.mod_group_investors(
-            "test", None, &[DBInvestor{
-                broker_id: "5100".to_string(),
-                investor_id: "123456".to_string(),
-                investor_name: "test".to_string(),
-                investor_desc: Default::default(),
-                first_day: None,
-                last_day: None,
-                created_at: None,
-                deleted_at: None,
-                groups: None,
-            }],
-        )).unwrap();
+        let g = rt
+            .block_on(db.mod_group_investors(
+                "test",
+                None,
+                &[DBInvestor {
+                    broker_id: "5100".to_string(),
+                    investor_id: "123456".to_string(),
+                    investor_name: "test".to_string(),
+                    investor_desc: Default::default(),
+                    first_day: None,
+                    last_day: None,
+                    created_at: None,
+                    deleted_at: None,
+                    groups: None,
+                }],
+            ))
+            .unwrap();
 
         log::info!("{:?}", g);
     }
-    
+
     #[test]
     fn test_query_holidays() {
         env_logger::Builder::new()
@@ -943,12 +976,10 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(open_db("./data", &["fund", "meta"]))
-            .unwrap();
-        
-        let result = rt.block_on(db.query_holidays())
-            .unwrap();
-        
+        let db = rt.block_on(open_db("./data", &["fund", "meta"])).unwrap();
+
+        let result = rt.block_on(db.query_holidays()).unwrap();
+
         for v in result {
             log::info!("{:?}", v);
         }

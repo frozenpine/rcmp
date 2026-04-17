@@ -2,10 +2,11 @@
 mod ctp;
 mod db;
 
-use chrono::Local;
+use chrono::{Local, NaiveDate};
 use ctp::tu;
 use derivative::Derivative;
 use futures::lock::Mutex;
+use futures::TryFutureExt;
 use std::fs;
 use tauri::path::BaseDirectory;
 use tauri::{Manager, State};
@@ -126,6 +127,37 @@ async fn query_holidays(state: State<'_, Mutex<Config>>) -> Result<Vec<db::DBHol
             log::error!("query holidays failed: {:?}", e);
             "query holidays failed".to_string()
         }),
+        None => Err("no database initialized.".into()),
+    }
+}
+
+#[tauri::command]
+async fn add_holiday(
+    name: String,
+    range: (String, String),
+    state: State<'_, Mutex<Config>>,
+) -> Result<db::DBHoliday, String> {
+    if name.is_empty() {
+        return Err("no holiday name".to_string());
+    }
+
+    if range.0.is_empty() || range.1.is_empty() {
+        return Err("date range value empty".to_string());
+    }
+
+    let cfg = state.lock().await;
+
+    match cfg._db.as_ref() {
+        Some(db) => {
+            let start = NaiveDate::parse_from_str(range.0.as_str(), "%Y-%m-%d")
+                .map_err(|e| e.to_string())?;
+            let end = NaiveDate::parse_from_str(range.1.as_str(), "%Y-%m-%d")
+                .map_err(|e| e.to_string())?;
+
+            db.add_holiday(&name, start, end)
+                .await
+                .map_err(|e| e.to_string())
+        }
         None => Err("no database initialized.".into()),
     }
 }
@@ -255,6 +287,7 @@ pub fn run() {
             query_investors,
             mod_group_investors,
             query_holidays,
+            add_holiday,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

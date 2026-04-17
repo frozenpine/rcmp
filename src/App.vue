@@ -17,6 +17,7 @@ import InvestorSelector from "./components/InvestorSelector.vue";
 import Statistics from "./components/Statistics.vue";
 import {useNotification} from "./utils/feedback.ts";
 import type {InvestorLoaderInst} from "./components/interface";
+import Calendar from "./components/Calendar.vue";
 
 import {fundStore} from "./store/fund.ts";
 import {metaStore} from "./store/meta.ts";
@@ -158,7 +159,11 @@ onMounted(async () => {
             <n-text>Welcome to RCMP</n-text>
           </n-h1>
         </template>
-        <template #extra><TUAccountSinker /></template>
+        <template #extra>
+          <n-flex justify="end" align="center">
+            <Calendar />
+            <TUAccountSinker />
+          </n-flex></template>
         <template #default><Statistics v-model:start="selectedStart" v-model:end="selectedEnd" /></template>
         <template #footer>
           <n-form class="query" :disabled="accountLoading" inline>

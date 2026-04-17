@@ -3,6 +3,7 @@ import dayjs from "dayjs"
 import { invoke } from "@tauri-apps/api/core";
 
 import { Vacation, DBInvestor, DBGroup } from "../models/db.ts"
+import { resolve } from "@tauri-apps/api/path";
 
 type DateType = string | number | dayjs.Dayjs | Date;
 
@@ -244,6 +245,11 @@ export const metaStore = defineStore("meta", {
                             resolve(this.vacation_list);
                         }).catch(reject);
                 }
+            })
+        },
+        async addNewVacation(name: string, range: [DateType, DateType]): Promise<Vacation> {
+            return new Promise((resolve, reject) => {
+                if (!name) reject("no holiday name")
             })
         }
     }
