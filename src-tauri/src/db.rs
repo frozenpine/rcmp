@@ -565,7 +565,7 @@ ORDER BY year, start"#,
 
         log::info!("adding new holiday[{}]: {:?}, {:?}", name, start, end);
 
-        let result = sqlx::query_as::<sqlx::Sqlite, DBHoliday>(
+        let mut result = sqlx::query_as::<sqlx::Sqlite, DBHoliday>(
             r#"INSERT INTO meta.holidays(
     year, name, start, end
 ) VALUES (?, ?, ?, ?) RETURNING *"#,
@@ -576,6 +576,10 @@ ORDER BY year, start"#,
         .bind(end_value)
         .fetch_one(&self.pool)
         .await?;
+
+        for d in start.iter_days().take_while(|d| *d <= end) {
+            result.range.push(d.format("%Y-%m-%d").to_string());
+        }
 
         Ok(result)
     }
