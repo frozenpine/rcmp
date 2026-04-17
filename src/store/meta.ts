@@ -254,8 +254,8 @@ export const metaStore = defineStore("meta", {
                 const end = dayjs(range[1])
 
                 invoke("add_holiday", {
-                    name,
-                    range: [start.format("YYYY-mm-dd"), end.format("YYYY-mm-dd")]
+                    name: name,
+                    range: [start.format("YYYY-MM-DD"), end.format("YYYY-MM-DD")]
                 }).then(v => {
                     const vacation = v as Vacation
 
@@ -263,6 +263,8 @@ export const metaStore = defineStore("meta", {
                     for (const day in vacation.range) {
                         this.holidays.set(day, vacation)
                     }
+
+                    console.log("new holiday appended", vacation);
 
                     resolve(vacation)
                 }).catch(e => {

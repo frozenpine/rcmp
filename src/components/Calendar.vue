@@ -9,13 +9,25 @@ import { useMessage } from "../utils/feedback.ts";
 const meta = metaStore();
 const message = useMessage();
 
-const newHolidayName = ref("")
-const newHolidayRange = ref()
+const newHolidayName = ref("");
+const newHolidayRange = ref<[number, number]>();
 
 function holidayName(year: number, month: number, day: number): string {
   const holiday = meta.getHoliday(`${year}-${month}-${day}`);
 
   return holiday ? holiday.name : "周末";
+}
+
+function addNewHoliday() {
+    if (!newHolidayName.value) return
+    if (!newHolidayRange.value) return
+
+    meta.addNewVacation(
+        newHolidayName.value, 
+        [newHolidayRange.value![0], newHolidayRange.value![1]],
+    ).then(
+        v => message.info(`新假日[${v.name}]已添加: ${v.start} ~ ${v.end}`)
+    ).catch(() => message.error(`新增假日失败`))
 }
 </script>
 
@@ -46,7 +58,7 @@ function holidayName(year: number, month: number, day: number): string {
                                              placeholder="请输入假日名"
                                              v-model:value="newHolidayName"></n-input>
                                     <n-button size="tiny" :disabled="!newHolidayName" 
-                                              @click="() => meta.addNewVacation(newHolidayName, newHolidayRange).catch(e => message.error(`新增假日失败: ${e}`))">
+                                              @click="addNewHoliday">
                                         确认
                                     </n-button>
                                 </n-flex>

@@ -147,6 +147,8 @@ async fn add_holiday(
 
     let cfg = state.lock().await;
 
+    log::info!("try add new holiday[{}]: {:?}", name, range);
+
     match cfg._db.as_ref() {
         Some(db) => {
             let start = NaiveDate::parse_from_str(range.0.as_str(), "%Y-%m-%d")

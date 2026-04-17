@@ -581,6 +581,8 @@ ORDER BY year, start"#,
             result.range.push(d.format("%Y-%m-%d").to_string());
         }
 
+        log::info!("new holiday inserted: {:?}", result,);
+
         Ok(result)
     }
 
