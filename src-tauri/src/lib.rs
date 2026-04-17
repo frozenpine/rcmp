@@ -6,7 +6,6 @@ use chrono::{Local, NaiveDate};
 use ctp::tu;
 use derivative::Derivative;
 use futures::lock::Mutex;
-use futures::TryFutureExt;
 use std::fs;
 use tauri::path::BaseDirectory;
 use tauri::{Manager, State};
