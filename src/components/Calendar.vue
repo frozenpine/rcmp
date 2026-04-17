@@ -3,9 +3,11 @@ import { ref } from "vue";
 import { NIcon, NCalendar, NPopover, NTag, NDatePicker, NButton, NFlex, NInput } from "naive-ui";
 import { CalendarAlt, Plus } from "@vicons/fa";
 
-import {metaStore} from "../store/meta.ts";
+import { metaStore } from "../store/meta.ts";
+import { useMessage } from "../utils/feedback.ts";
 
 const meta = metaStore();
+const message = useMessage();
 
 const newHolidayName = ref("")
 const newHolidayRange = ref()
@@ -43,7 +45,10 @@ function holidayName(year: number, month: number, day: number): string {
                                     <n-input size="tiny" style="width: 30%;" 
                                              placeholder="请输入假日名"
                                              v-model:value="newHolidayName"></n-input>
-                                    <n-button size="tiny" :disabled="!newHolidayName">确认</n-button>
+                                    <n-button size="tiny" :disabled="!newHolidayName" 
+                                              @click="() => meta.addNewVacation(newHolidayName, newHolidayRange).catch(e => message.error(`新增假日失败: ${e}`))">
+                                        确认
+                                    </n-button>
                                 </n-flex>
                             </template>
                         </n-date-picker>
