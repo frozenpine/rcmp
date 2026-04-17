@@ -1,0 +1,3 @@
+data_base = "./data"
+sql_base = "./sql"
+schemas = ["meta", "fund"]

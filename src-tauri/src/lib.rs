@@ -2,27 +2,26 @@
 mod ctp;
 mod db;
 
-use std::fs;
 use chrono::Local;
+use ctp::tu;
 use derivative::Derivative;
 use futures::lock::Mutex;
+use std::fs;
 use tauri::path::BaseDirectory;
 use tauri::{Manager, State};
-use ctp::tu;
 
-async fn sink_tu_accounts(
-    db: &db::DB, accounts: Vec<tu::Account>,
-) -> Result<u64, String> {
-    db.sink_accounts(&accounts, 1000)
-        .await
-        .map_err(|e| {
-            log::error!("sink tu accounts failed: {:?}", e);
-            "sink tu accounts failed".to_string()
-        })
+async fn sink_tu_accounts(db: &db::DB, accounts: Vec<tu::Account>) -> Result<u64, String> {
+    db.sink_accounts(&accounts, 1000).await.map_err(|e| {
+        log::error!("sink tu accounts failed: {:?}", e);
+        "sink tu accounts failed".to_string()
+    })
 }
 
 #[tauri::command]
-async fn query_investors(include_all: bool, state: State<'_, Mutex<Config>>) -> Result<Vec<db::DBInvestor>, String> {
+async fn query_investors(
+    include_all: bool,
+    state: State<'_, Mutex<Config>>,
+) -> Result<Vec<db::DBInvestor>, String> {
     let cfg = state.lock().await;
 
     match cfg._db.as_ref() {
@@ -30,7 +29,7 @@ async fn query_investors(include_all: bool, state: State<'_, Mutex<Config>>) -> 
             log::error!("query investors failed: {:?}", e);
             "query investors failed".to_string()
         }),
-        None => Err("no database initialized.".into())
+        None => Err("no database initialized.".into()),
     }
 }
 
@@ -44,36 +43,41 @@ async fn mod_group_investors(
     let cfg = state.lock().await;
 
     match cfg._db.as_ref() {
-        Some(db) => db.mod_group_investors(
-                group_name, group_desc, &investors,
-            ).await.map_err(|e| {
+        Some(db) => db
+            .mod_group_investors(group_name, group_desc, &investors)
+            .await
+            .map_err(|e| {
                 log::error!("mod group investors failed: {:?}", e);
                 "mod group investors failed".to_string()
             }),
-        None => Err("no database initialized.".into())
+        None => Err("no database initialized.".into()),
     }
 }
 
 #[tauri::command]
 async fn sink_tu_account_dir(
-    base_dir: &str, accounts: Vec<&str>, state: State<'_, Mutex<Config>>,
+    base_dir: &str,
+    accounts: Vec<&str>,
+    state: State<'_, Mutex<Config>>,
 ) -> Result<u64, String> {
     let cfg = state.lock().await;
 
     match cfg._db.as_ref() {
         Some(db) => {
-            let accounts = tu::read_account_dir(base_dir, &accounts, 1)
-                .map_err(|e| e.to_string())?;
+            let accounts =
+                tu::read_account_dir(base_dir, &accounts, 1).map_err(|e| e.to_string())?;
 
             sink_tu_accounts(db, accounts).await
         }
-        None => Err("no database initialized.".into())
+        None => Err("no database initialized.".into()),
     }
 }
 
 #[tauri::command]
 async fn sink_tu_account_files(
-    csv_files: Vec<&str>, accounts: Vec<&str>, state: State<'_, Mutex<Config>>
+    csv_files: Vec<&str>,
+    accounts: Vec<&str>,
+    state: State<'_, Mutex<Config>>,
 ) -> Result<u64, String> {
     let cfg = state.lock().await;
 
@@ -82,14 +86,13 @@ async fn sink_tu_account_files(
             let mut data: Vec<Vec<tu::Account>> = Vec::with_capacity(csv_files.len());
 
             for file in csv_files {
-                let accounts = tu::read_account_csv(file, &accounts)
-                    .map_err(|e| e.to_string())?;
+                let accounts = tu::read_account_csv(file, &accounts).map_err(|e| e.to_string())?;
                 data.push(accounts);
             }
 
             sink_tu_accounts(db, data.concat()).await
         }
-        None => Err("no database initialized.".into())
+        None => Err("no database initialized.".into()),
     }
 }
 
@@ -115,19 +118,15 @@ async fn query_accounts(
 }
 
 #[tauri::command]
-async fn query_holidays(
-    state: State<'_, Mutex<Config>>,
-) -> Result<Vec<db::DBHoliday>, String> {
+async fn query_holidays(state: State<'_, Mutex<Config>>) -> Result<Vec<db::DBHoliday>, String> {
     let cfg = state.lock().await;
 
     match cfg._db.as_ref() {
-        Some(db) => db.query_holidays()
-            .await
-            .map_err(|e| {
-                log::error!("query holidays failed: {:?}", e);
-                "query holidays failed".to_string()
-            }),
-        None => Err("no database initialized.".into())
+        Some(db) => db.query_holidays().await.map_err(|e| {
+            log::error!("query holidays failed: {:?}", e);
+            "query holidays failed".to_string()
+        }),
+        None => Err("no database initialized.".into()),
     }
 }
 
@@ -153,55 +152,61 @@ pub fn run() {
             log::info!("tauri config: {:?}", tauri_cfg);
             log::info!("using config file: config/config.toml");
 
-            let resource_path = app
+            let cfg_tpl = app
                 .path()
-                .resolve("config/config.toml", BaseDirectory::Resource)
+                .resolve("config/config.toml.tpl", BaseDirectory::Resource)
                 .map_err(|e| {
-                    log::error!("failed to resolve config path: {:?}", e);
+                    log::error!("failed to resolve config template path: {:?}", e);
                     e
                 })?;
 
-            let cfg_file = fs::read_to_string(
-                resource_path.clone()
-            ).map_err(|e| {
+            let resource_path = cfg_tpl
+                .parent()
+                .expect("fail to get config parent")
+                .join("config.toml");
+
+            if !resource_path.exists() {
+                fs::copy(cfg_tpl, resource_path.clone())?;
+            }
+
+            let cfg_file = fs::read_to_string(resource_path).map_err(|e| {
                 log::error!("read config file failed: {:?}", e);
                 e
             })?;
 
-            let mut cfg: Config = toml::from_str(&cfg_file)
-                .map_err(|e| {
-                    log::error!("parse config failed: {:?}", e);
-                    e
-                })?;
+            let mut cfg: Config = toml::from_str(&cfg_file).map_err(|e| {
+                log::error!("parse config failed: {:?}", e);
+                e
+            })?;
 
-            if !fs::exists(&cfg.data_base)
-                .map_err(|e| {
-                    log::error!("check data dir failed: {:?}", e);
-                    e
-                })?
-            {
+            if !fs::exists(&cfg.data_base).map_err(|e| {
+                log::error!("check data dir failed: {:?}", e);
+                e
+            })? {
                 log::info!("making data base dir: {}", &cfg.data_base);
 
-                fs::create_dir_all(&cfg.data_base)
-                    .map_err(|e| {
-                        log::error!("create data base dir failed: {:?}", e);
-                        e
-                    })?;
+                fs::create_dir_all(&cfg.data_base).map_err(|e| {
+                    log::error!("create data base dir failed: {:?}", e);
+                    e
+                })?;
 
                 log::info!("create data base dir: {}", &cfg.data_base);
             }
 
             let db = tauri::async_runtime::block_on(db::migrate_db(
-                &cfg.data_base, &cfg.sql_base,
+                &cfg.data_base,
+                &cfg.sql_base,
                 tauri_cfg.version.clone().unwrap_or_default().as_str(),
                 &cfg.schemas
                     .iter()
                     .map(|v| v.as_str())
                     .collect::<Vec<&str>>(),
-            )).map_err(|e| {
+            ))
+            .map_err(|e| {
                 log::error!("migrate db failed: {:?}", e);
                 e
-            }).expect("migrate db failed");
+            })
+            .expect("migrate db failed");
 
             cfg._db = Some(db);
 
@@ -214,10 +219,12 @@ pub fn run() {
         .plugin(tauri_plugin_sql::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_pinia::Builder::new()
-            .path("./data")
-            .autosave(std::time::Duration::from_secs(300))
-            .build())
+        .plugin(
+            tauri_plugin_pinia::Builder::new()
+                .path("./data")
+                .autosave(std::time::Duration::from_secs(300))
+                .build(),
+        )
         .plugin(
             tauri_plugin_log::Builder::new()
                 .clear_targets()
@@ -255,8 +262,8 @@ pub fn run() {
 
 #[cfg(test)]
 mod test {
-    use std::env;
     use super::*;
+    use std::env;
 
     #[test]
     fn test_sink_file() {
@@ -268,22 +275,18 @@ mod test {
         let p = env::current_dir().unwrap();
         log::info!("current directory: {}", p.display());
 
-        let accounts = tu::read_account_csv(
-            "../data/查询资金2025-02-06.csv", &[],
-        ).unwrap();
+        let accounts = tu::read_account_csv("../data/查询资金2025-02-06.csv", &[]).unwrap();
 
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();
 
-        let db = rt.block_on(db::open_db("../data", &["fund"]))
-            .unwrap();
+        let db = rt.block_on(db::open_db("../data", &["fund"])).unwrap();
 
         log::info!("{:?}", &db);
 
-        let row_count = rt.block_on(db.sink_accounts(&accounts, 1000))
-            .unwrap();
+        let row_count = rt.block_on(db.sink_accounts(&accounts, 1000)).unwrap();
 
         log::info!("row affected: {}", row_count);
     }
@@ -302,14 +305,11 @@ mod test {
             .build()
             .unwrap();
 
-        let db = rt.block_on(db::open_db("../data", &["fund"]))
-            .unwrap();
+        let db = rt.block_on(db::open_db("../data", &["fund"])).unwrap();
 
         log::info!("{:?}", &db);
 
-        let row_count = rt
-            .block_on(db.sink_accounts(&accounts, 1000))
-            .unwrap();
+        let row_count = rt.block_on(db.sink_accounts(&accounts, 1000)).unwrap();
 
         log::info!("row affected: {}", row_count);
     }

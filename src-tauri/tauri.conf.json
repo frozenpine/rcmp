@@ -23,7 +23,9 @@
       "capabilities": [
         {
           "identifier": "dialog",
-          "windows": ["*"],
+          "windows": [
+            "*"
+          ],
           "permissions": [
             "dialog:allow-open",
             "dialog:allow-save"
@@ -31,9 +33,12 @@
         },
         {
           "identifier": "pinia",
-          "windows": ["*"],
+          "windows": [
+            "*"
+          ],
           "permissions": [
-            "pinia:default", "core:event:default"
+            "pinia:default",
+            "core:event:default"
           ]
         }
       ]
@@ -50,11 +55,10 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "config/config.toml",
+      "config/config.toml.tpl",
       "sql/fund/*.sql",
       "sql/meta/*.sql"
     ]
   },
-  "plugins": {
-  }
+  "plugins": {}
 }
