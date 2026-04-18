@@ -47,7 +47,7 @@ const notification = useNotification();
 
 const showWaterMark = ref(false);
 
-const dateRange: [string|undefined, string|undefined] = [undefined, undefined];
+const dateRange: [string | undefined, string | undefined] = [undefined, undefined];
 
 interface RowData extends DBAccount {
   [index: string | symbol]: string | number | RowData[] | undefined;
@@ -421,8 +421,8 @@ const headerColumnOptions = computed((): HeaderColumnOption[] => {
               value: showWaterMark.value,
               onUpdateValue: (v) => showWaterMark.value = v,
             }, {
-              checked: () => "显示水印",
-              unchecked: () => "隐藏水印",
+              checked: () => "水印",
+              unchecked: () => "无水印",
             }),
           ]
         }
@@ -616,12 +616,12 @@ const contextMenu = ref<{
   x: number;
   y: number;
   show: boolean;
-  options: {key: string; label: string;}[];
+  options: { key: string; label: string; }[];
 }>({
   x: 0, y: 0,
   show: false,
   options: [
-    { label: '导出最新数据', key: 'latest' }, 
+    { label: '导出最新数据', key: 'latest' },
     { label: '导出历史数据', key: 'all' },
   ],
 });

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import {NButton, NButtonGroup, NIcon, NModal, NModalProvider, NSelect, NFlex} from "naive-ui";
-import {computed, h, ref} from "vue";
+import { NButton, NButtonGroup, NIcon, NModal, NModalProvider, NSelect, NFlex } from "naive-ui";
+import { computed, h, ref } from "vue";
 
-import {metaStore} from "../store/meta.ts"
+import { metaStore } from "../store/meta.ts"
 import dayjs from "dayjs";
-import {useNotification} from "../utils/feedback.ts";
+import { useNotification } from "../utils/feedback.ts";
 import GroupEditor from "./GroupEditor.vue";
-import {EditNoteFilled, RefreshFilled} from "@vicons/material";
+import { EditNoteFilled, RefreshFilled } from "@vicons/material";
 
 const meta = metaStore();
 const notification = useNotification();
@@ -27,7 +27,7 @@ const showEditor = ref(false);
 
 const groupOptions = computed(() => {
   return meta.groupInvestors.filter(
-      g => g.group_name != "未分组"
+    g => g.group_name != "未分组"
   ).map((g) => {
     return {
       label: g.group_name,
@@ -36,34 +36,34 @@ const groupOptions = computed(() => {
   });
 })
 
-function loadGroupInvestors(force: boolean=false) {
+function loadGroupInvestors(force: boolean = false) {
   investorLoading.value = true;
-  meta.doQueryInvestors({force: force})
-      .then((investors) => {
-        const group_investors = meta.groupInvestors;
-        notification.info({
-          title: "投资者组查询完成",
-          description: `投资者账号总计: ${investors.length}`,
-          content: () => h(
-              NFlex, {vertical: true},
-              {
-                default: () => group_investors.map(
-                    (g) => h("span", `投资者组[${g.group_name}]账号合计: ${g.investors?.length}`)
-                )
-              },
-          ),
-          meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-          duration: 3000,
-        })
-      }).catch((err) => {
-    console.error("query investors failed:", err);
-    notification.error({
-      title: "投资者组查询错误",
-      content: err.message,
-      closable: false,
-      meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-    })
-  }).finally(()=>investorLoading.value = false);
+  meta.doQueryInvestors({ force: force })
+    .then((investors) => {
+      const group_investors = meta.groupInvestors;
+      notification.info({
+        title: "投资者组查询完成",
+        description: `投资者账号总计: ${investors.length}`,
+        content: () => h(
+          NFlex, { vertical: true },
+          {
+            default: () => group_investors.map(
+              (g) => h("span", `投资者组[${g.group_name}]账号合计: ${g.investors?.length}`)
+            )
+          },
+        ),
+        meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+        duration: 3000,
+      })
+    }).catch((err) => {
+      console.error("query investors failed:", err);
+      notification.error({
+        title: "投资者组查询错误",
+        content: err.message,
+        closable: false,
+        meta: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+      })
+    }).finally(() => investorLoading.value = false);
 }
 
 defineExpose({
@@ -77,20 +77,22 @@ defineExpose({
       <GroupEditor :selected="selected" @close="showEditor = false" />
     </n-modal>
   </n-modal-provider>
-  <n-select :loading="loading || investorLoading" :multiple="multiple"
-            v-model:value="selected" :options="groupOptions"
-            placeholder="请选择投资者组"
-            size="small" tag filterable clearable>
+  <n-select :loading="loading || investorLoading" :multiple="multiple" v-model:value="selected" :options="groupOptions"
+    placeholder="请选择投资者组" size="small" tag filterable clearable>
     <template #action>
       <n-flex justify="end">
         <n-button-group size="tiny">
           <n-button @click="loadGroupInvestors(true)" round>
-            <template #icon><RefreshFilled/></template>
+            <template #icon>
+              <RefreshFilled />
+            </template>
             刷新
           </n-button>
           <n-button @click="showEditor = true" round>
             <template #icon>
-              <n-icon><EditNoteFilled/></n-icon>
+              <n-icon>
+                <EditNoteFilled />
+              </n-icon>
             </template>
             编辑
           </n-button>
@@ -100,6 +102,4 @@ defineExpose({
   </n-select>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

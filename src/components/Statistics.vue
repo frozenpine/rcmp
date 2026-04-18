@@ -4,7 +4,7 @@ import { NDatePicker, NIcon, NGrid, NGridItem, NStatistic, NPopover, NFlex } fro
 import { User, Users, CalendarAlt, InfoCircle } from "@vicons/fa";
 
 import { metaStore } from "../store/meta.ts";
-import { Thousandth } from "../utils/formatter.ts"
+import { Thousandth } from "../utils/formatter.ts";
 
 const meta = metaStore();
 const countFmt = Thousandth(0)
@@ -44,8 +44,9 @@ watch(
   <n-grid :cols="4" :x-gap="5">
     <n-grid-item>
       <n-flex justify="center">
-        <n-statistic label="起始日期" @dblclick="startEdit = true; nextTick(() => { startPickerRef.focus() });"
-          tabular-nums>
+        <n-statistic label="起始日期" @dblclick="() => {
+          startEdit = true; nextTick(() => startPickerRef.focus());
+        }" tabular-nums>
           <template #prefix v-if="!startEdit">
             <n-icon size="15">
               <CalendarAlt />
@@ -53,9 +54,12 @@ watch(
           </template>
           <n-date-picker ref="startPickerRef" type="date" v-model:formatted-value="selectedStart"
             :is-date-disabled="meta.isHoliday" @blur="() => startEdit = false" clearable v-if="startEdit" />
-          <span class="content" v-else>{{ selectedStart ? selectedStart : firstDate }}</span>
+          <span class="content" :class="{ invalid: selectedStart && selectedStart > lastDate }" v-else>
+            {{ selectedStart ? selectedStart : firstDate }}
+          </span>
           <template #suffix>
-            <span class="content" v-if="!startEdit && selectedStart && selectedStart !== firstDate"> / {{ firstDate }}
+            <span class="content" v-if="!startEdit && selectedStart && selectedStart !== firstDate">
+              / {{ firstDate }}
             </span>
             <n-popover placement="bottom-start" v-if="!startEdit">
               <template #trigger>
@@ -71,7 +75,9 @@ watch(
     </n-grid-item>
     <n-grid-item>
       <n-flex justify="center">
-        <n-statistic label="截止日期" @dblclick="endEdit = true; nextTick(() => { endPickerRef.focus() });" tabular-nums>
+        <n-statistic label="截止日期" @dblclick="() => {
+          endEdit = true; nextTick(() => { endPickerRef.focus() });
+        }" tabular-nums>
           <template #prefix v-if="!endEdit">
             <n-icon size="15">
               <CalendarAlt />
@@ -79,9 +85,13 @@ watch(
           </template>
           <n-date-picker ref="endPickerRef" type="date" v-model:formatted-value="selectedEnd"
             :is-date-disabled="meta.isHoliday" @blur="() => endEdit = false" clearable v-if="endEdit" />
-          <span class="content" v-else>{{ selectedEnd ? selectedEnd : lastDate }}</span>
+          <span class="content" :class="{ invalid: selectedEnd && selectedEnd < firstDate }" v-else>
+            {{ selectedEnd ? selectedEnd : lastDate }}
+          </span>
           <template #suffix>
-            <span class="content" v-if="!endEdit && selectedEnd && selectedEnd !== lastDate">/ {{ lastDate }}</span>
+            <span class="content" v-if="!endEdit && selectedEnd && selectedEnd !== lastDate">
+              / {{ lastDate }}
+            </span>
             <n-popover placement="bottom-start" v-if="!endEdit">
               <template #trigger>
                 <n-icon size="15" style="margin-left: 5px;">
@@ -134,5 +144,9 @@ watch(
 
 .content {
   font-size: 15px;
+}
+
+.invalid {
+  color: red
 }
 </style>
