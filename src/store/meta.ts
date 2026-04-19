@@ -3,7 +3,6 @@ import dayjs from "dayjs"
 import { invoke } from "@tauri-apps/api/core";
 
 import { Vacation, DBInvestor, DBGroup } from "../models/db.ts"
-import { resolve } from "@tauri-apps/api/path";
 
 type DateType = string | number | dayjs.Dayjs | Date;
 
