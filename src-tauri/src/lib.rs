@@ -163,6 +163,29 @@ async fn add_holiday(
     }
 }
 
+#[tauri::command]
+async fn remove_holiday(
+    year: i32,
+    name: String,
+    state: State<'_, Mutex<Config>>,
+) -> Result<u64, String> {
+    if name.is_empty() {
+        return Err("no holiday name".to_string());
+    }
+
+    let cfg = state.lock().await;
+
+    log::info!("try remove holiday: {}, {}", year, name);
+
+    match cfg._db.as_ref() {
+        Some(db) => db
+            .remove_holiday(year, &name)
+            .await
+            .map_err(|e| e.to_string()),
+        None => Err("no database initialized.".into()),
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Derivative)]
 #[derivative(Debug)]
 struct Config {
@@ -289,6 +312,7 @@ pub fn run() {
             mod_group_investors,
             query_holidays,
             add_holiday,
+            remove_holiday,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

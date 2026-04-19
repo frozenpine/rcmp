@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed, h } from "vue";
 import {
     NIcon, NCalendar, NPopover, NTag, NDatePicker,
-    NButton, NButtonGroup, NFlex, NInput,
+    NButton, NButtonGroup, NFlex, NInput, NTree,
+    TreeOption, NPopconfirm, NThing,
 } from "naive-ui";
-import { CalendarAlt, Plus } from "@vicons/fa";
+import { CalendarAlt, Plus, Minus } from "@vicons/fa";
 
 import { metaStore } from "../store/meta.ts";
 import { useMessage } from "../utils/feedback.ts";
+import { Vacation } from "../models/db.ts";
 
 const meta = metaStore();
 const message = useMessage();
@@ -33,6 +35,65 @@ function addNewHoliday() {
         message.info(`新假日[${v.name}]已添加: ${v.start} ~ ${v.end}`)
         tdCalendar.value.setShow(false)
     }).catch(() => message.error(`新增假日失败`))
+}
+
+const holidayTree = computed(() => {
+    return meta.vacation_list.sort((l, r) => r.end - l.end).reduce(
+        (data, item) => {
+            const last = data[data.length - 1]
+
+            const itemYear = `${item.year}`
+
+            if (!last || itemYear !== last.key) {
+                data.push({
+                    label: itemYear,
+                    key: itemYear,
+                    children: [{
+                        label: item.name,
+                        key: `${item.year}_${item.name}`,
+                        data: item,
+                    }],
+                })
+            } else {
+                last!.children!.push({
+                    label: item.name,
+                    key: `${item.year}_${item.name}`,
+                    data: item,
+                })
+            }
+
+            return data
+        },
+        [] as Array<TreeOption>,
+    )
+})
+
+const holidayTreeLabelRender = ({ option }: { option: TreeOption }) => {
+    if (option.children) return option.label
+
+    const holiday: Vacation = option.data as any
+
+    return h(NPopconfirm, {
+        onPositiveClick: () => {
+            meta.removeVacation(
+                holiday.year, holiday.name,
+            ).then(v => {
+                if (v > 0) {
+                    message.info(`${holiday.year} 年假日 ${holiday.name} 已删除`)
+                } else {
+                    message.warning(`${holiday.year} 年假日 ${holiday.name} 不存在`)
+                }
+            }).catch(e => message.error(`假日删除失败：${e}`))
+        },
+        style: "min-width: 200px",
+    }, {
+        trigger: () => option.label,
+        default: () => h(NThing, {
+            title: `${holiday.year}`,
+            description: holiday.name,
+            content: `是否确认删除该假日: ${holiday.start} ~ ${holiday.end} ?`
+        }, {})
+    })
 }
 </script>
 
@@ -75,9 +136,24 @@ function addNewHoliday() {
                             </template>
                         </n-date-picker>
                     </n-popover>
+                    <n-popover trigger="click" placement="bottom">
+                        <template #trigger>
+                            <n-button size="tiny" text>
+                                <template #icon>
+                                    <n-icon>
+                                        <Minus />
+                                    </n-icon>
+                                </template>
+                                删除假日
+                            </n-button>
+                        </template>
+                        <n-tree :data="holidayTree" block-line block-node accordion check-strategy="child" show-line
+                            virtual-scroll style="max-height: 300px; min-width: 150px;"
+                            :render-label="holidayTreeLabelRender"
+                            :override-default-node-click-behavior="({ option }) => option.children ? 'toggleExpand' : 'default'"></n-tree>
+                    </n-popover>
                 </n-flex>
             </template>
-
             <template #default="{ year, month, date }">
                 <n-tag v-if="meta.isHoliday(`${year}-${month}-${date}`)" type="error" size="small" round disabled
                     :bordered="false">

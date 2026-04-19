@@ -3,6 +3,7 @@ import dayjs from "dayjs"
 import { invoke } from "@tauri-apps/api/core";
 
 import { Vacation, DBInvestor, DBGroup } from "../models/db.ts"
+import { resolve } from "@tauri-apps/api/path";
 
 type DateType = string | number | dayjs.Dayjs | Date;
 
@@ -248,30 +249,58 @@ export const metaStore = defineStore("meta", {
         },
         async addNewVacation(name: string, range: [DateType, DateType]): Promise<Vacation> {
             return new Promise((resolve, reject) => {
-                if (!name) reject("no holiday name");
+                if (!name) return reject("no holiday name");
 
                 const start = dayjs(range[0])
                 const end = dayjs(range[1])
 
-                invoke("add_holiday", {
+                invoke<Vacation>("add_holiday", {
                     name: name,
                     range: [start.format("YYYY-MM-DD"), end.format("YYYY-MM-DD")]
                 }).then(v => {
-                    const vacation = v as Vacation
-
-                    this.vacation_list.push(vacation)
-                    for (const day in vacation.range) {
-                        this.holidays.set(day, vacation)
+                    this.vacation_list.push(v)
+                    for (const day in v.range) {
+                        this.holidays.set(day, v)
                     }
 
-                    console.log("new holiday appended", vacation);
+                    console.log("new holiday appended", v);
 
-                    resolve(vacation)
+                    resolve(v)
                 }).catch(e => {
                     console.log("insert holiday failed", e);
                     reject(e)
                 })
             })
-        }
+        },
+        async removeVacation(year: number, name: string): Promise<number> {
+            return new Promise((resolve, reject) => {
+                if (!name) return reject("no holiday name");
+
+                let idx = -1;
+                for (let i = 0; i < this.vacation_list.length; i++) {
+                    const v = this.vacation_list[i]
+                    if (v.year === year && v.name === name) {
+                        idx = i;
+                        break;
+                    }
+                }
+
+                invoke<number>("remove_holiday", { year, name }).then((v) => {
+                    console.log("holiday deleted", v)
+                    if (v === 1 && idx >= 0) {
+                        const vacation = this.vacation_list.splice(idx, 1)[0]
+
+                        vacation.range.forEach(v => {
+                            this.holidays.delete(v)
+                        })
+                    }
+
+                    resolve(v)
+                }).catch(e => {
+                    console.log("remove holiday failed", year, name, e)
+                    reject(e)
+                })
+            })
+        },
     }
 })

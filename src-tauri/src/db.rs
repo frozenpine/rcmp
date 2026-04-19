@@ -586,6 +586,17 @@ ORDER BY year, start"#,
         Ok(result)
     }
 
+    pub async fn remove_holiday(&self, year: i32, name: &str) -> Result<u64, Box<dyn Error>> {
+        let result =
+            sqlx::query::<sqlx::Sqlite>(r#"DELETE FROM meta.holidays WHERE year=? AND name=?"#)
+                .bind(year)
+                .bind(name)
+                .execute(&self.pool)
+                .await?;
+
+        Ok(result.rows_affected())
+    }
+
     pub fn is_closed(&self) -> bool {
         self.pool.is_closed()
     }
