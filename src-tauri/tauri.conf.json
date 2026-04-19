@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "rcmp",
-        "minWidth": 800,
-        "minHeight": 600,
+        "minWidth": 1024,
+        "minHeight": 768,
         "center": true
       }
     ],

@@ -44,30 +44,26 @@ watch(
   <n-grid :cols="4" :x-gap="5">
     <n-grid-item>
       <n-flex justify="center">
-        <n-statistic label="起始日期" @dblclick="() => {
-          startEdit = true; nextTick(() => startPickerRef.focus());
-        }" tabular-nums>
+        <n-statistic :label="`起始日期 ${firstDate ? '(' + firstDate + ')' : ''}`" tabular-nums>
           <template #prefix v-if="!startEdit">
             <n-icon size="15">
               <CalendarAlt />
             </n-icon>
           </template>
-          <n-date-picker ref="startPickerRef" type="date" v-model:formatted-value="selectedStart"
+          <n-date-picker ref="startPickerRef" type="date" class="datepicker" v-model:formatted-value="selectedStart"
             :is-date-disabled="meta.isHoliday" @blur="() => startEdit = false" clearable v-if="startEdit" />
-          <span class="content" :class="{ invalid: selectedStart && selectedStart > lastDate }" v-else>
+          <span class="content" :class="{ invalid: selectedStart && selectedStart > lastDate }"
+            @dblclick="() => { startEdit = true; nextTick(() => startPickerRef.focus()); }" v-else>
             {{ selectedStart ? selectedStart : firstDate }}
           </span>
           <template #suffix>
-            <span class="content" v-if="!startEdit && selectedStart && selectedStart !== firstDate">
-              / {{ firstDate }}
-            </span>
             <n-popover placement="bottom-start" v-if="!startEdit">
               <template #trigger>
                 <n-icon size="15" style="margin-left: 5px;">
                   <InfoCircle />
                 </n-icon>
               </template>
-              双击选择查询起始日期
+              双击日期选择查询起始日期
             </n-popover>
           </template>
         </n-statistic>
@@ -75,30 +71,26 @@ watch(
     </n-grid-item>
     <n-grid-item>
       <n-flex justify="center">
-        <n-statistic label="截止日期" @dblclick="() => {
-          endEdit = true; nextTick(() => { endPickerRef.focus() });
-        }" tabular-nums>
+        <n-statistic :label="`截止日期 ${lastDate ? '(' + lastDate + ')' : ''}`" tabular-nums>
           <template #prefix v-if="!endEdit">
             <n-icon size="15">
               <CalendarAlt />
             </n-icon>
           </template>
-          <n-date-picker ref="endPickerRef" type="date" v-model:formatted-value="selectedEnd"
+          <n-date-picker ref="endPickerRef" type="date" class="datepicker" v-model:formatted-value="selectedEnd"
             :is-date-disabled="meta.isHoliday" @blur="() => endEdit = false" clearable v-if="endEdit" />
-          <span class="content" :class="{ invalid: selectedEnd && selectedEnd < firstDate }" v-else>
+          <span class="content" :class="{ invalid: selectedEnd && selectedEnd < firstDate }"
+            @dblclick="() => { endEdit = true; nextTick(() => { endPickerRef.focus() }); }" v-else>
             {{ selectedEnd ? selectedEnd : lastDate }}
           </span>
           <template #suffix>
-            <span class="content" v-if="!endEdit && selectedEnd && selectedEnd !== lastDate">
-              / {{ lastDate }}
-            </span>
             <n-popover placement="bottom-start" v-if="!endEdit">
               <template #trigger>
                 <n-icon size="15" style="margin-left: 5px;">
                   <InfoCircle />
                 </n-icon>
               </template>
-              双击选择查询截止日期
+              双击日期选择查询截止日期
             </n-popover>
           </template>
         </n-statistic>
@@ -148,5 +140,9 @@ watch(
 
 .invalid {
   color: red
+}
+
+.datepicker {
+  width: 10ch;
 }
 </style>
